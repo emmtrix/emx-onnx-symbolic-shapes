@@ -1,1 +1,26 @@
 # emx-onnx-symbolic-shapes
+
+Reference implementation for **OSCL – ONNX Shape Constraint Language**, a declarative DSL for specifying shape inference rules for ONNX operators.
+
+## Overview
+
+This repository serves as the canonical reference implementation accompanying the OSCL RFC.  
+The goal is to provide a portable, deterministic engine that can:
+
+- parse OSCL shape rule definitions
+- propagate symbolic shapes through ONNX computation graphs
+- validate shape constraints
+- support partial / symbolic shape inference
+
+## RFC
+
+The full specification is available in [`docs/rfc-oscl.md`](docs/rfc-oscl.md).
+
+## Status
+
+Early draft / prototype stage. See the RFC for design details and open questions.
+
+## Contributing
+
+Contributions, feedback, and prototype implementations in Python, C++, or Rust are welcome.  
+Please open an issue or pull request and reference the relevant RFC section.
