@@ -715,8 +715,11 @@ def _builtin_dft_shape(args: list[Any]) -> list[int | None]:
     rank = len(result)
     if axis < 0:
         axis += rank
-    # If input doesn't already have complex dim (last dim != 2), add it
-    if result[-1] != 2:
+    # The last dim encodes real (1) or complex (2).
+    # Output is always complex, so last dim becomes 2.
+    if result and result[-1] == 1:
+        result[-1] = 2
+    elif not result or result[-1] != 2:
         result.append(2)
     if onesided and 0 <= axis < len(result):
         d = result[axis]
@@ -726,14 +729,32 @@ def _builtin_dft_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_stft_shape(args: list[Any]) -> list[int | None]:
-    """``stft_shape(signal_shape, frame_step, window, onesided)``."""
-    signal_shape, frame_step, window, onesided = args
+    """``stft_shape(signal_shape, frame_step, window_shape, onesided)``."""
+    signal_shape, frame_step_vals, window_shape, onesided = args
     signal_shape = _to_shape(signal_shape)
-    # signal: [batch, signal_length] or [batch, signal_length, 1/2]
+    window_shape = _to_shape(window_shape) if window_shape else []
     batch = signal_shape[0] if signal_shape else None
-    # Output: [batch, num_frames, fft_length, 2]
-    # This is complex - return None dims for data-dependent values
-    return [batch, None, None, 2]
+    signal_length = signal_shape[1] if len(signal_shape) > 1 else None
+
+    # Determine frame_length from window shape
+    frame_length: int | None = window_shape[0] if window_shape else None
+
+    # frame_step is a scalar tensor value passed via shape_value()
+    step: int | None = None
+    if isinstance(frame_step_vals, list) and len(frame_step_vals) == 1:
+        step = int(frame_step_vals[0])
+
+    # num_frames = (signal_length - frame_length) / frame_step + 1
+    num_frames: int | None = None
+    if signal_length is not None and frame_length is not None and step:
+        num_frames = (signal_length - frame_length) // step + 1
+
+    # fft_length depends on onesided flag
+    fft_length: int | None = None
+    if frame_length is not None:
+        fft_length = frame_length // 2 + 1 if onesided else frame_length
+
+    return [batch, num_frames, fft_length, 2]
 
 
 def _builtin_col2im_shape(args: list[Any]) -> list[int | None]:
@@ -753,9 +774,18 @@ def _builtin_col2im_shape(args: list[Any]) -> list[int | None]:
 
 def _builtin_range_output_shape(args: list[Any]) -> list[int | None]:
     """``range_output_shape(start, limit, delta)``."""
-    # The output is 1-D with length ceil((limit - start) / delta)
-    # But start/limit/delta are scalar tensor values, not shapes
-    # We return unknown since we may not have the values
+    start_vals, limit_vals, delta_vals = args
+    # start/limit/delta are scalar tensor values passed via shape_value().
+    if (
+        isinstance(start_vals, list) and len(start_vals) == 1
+        and isinstance(limit_vals, list) and len(limit_vals) == 1
+        and isinstance(delta_vals, list) and len(delta_vals) == 1
+    ):
+        start = start_vals[0]
+        limit = limit_vals[0]
+        delta = delta_vals[0]
+        if delta != 0:
+            return [max(0, math.ceil((limit - start) / delta))]
     return [_UNKNOWN]
 
 
@@ -1025,181 +1055,6 @@ def _execute_spec(
 # ONNX helper utilities
 # ---------------------------------------------------------------------------
 
-# Mapping from ONNX op_type to OSCL spec name (lowercase).
-_OP_TO_SPEC: dict[str, str] = {
-    # --- already supported ---
-    "Add": "add",
-    "Concat": "concat",
-    "Flatten": "flatten",
-    "Gather": "gather",
-    "Gemm": "gemm",
-    "MatMul": "matmul",
-    "NonZero": "nonzero",
-    "Relu": "relu",
-    "Reshape": "reshape",
-    "Softmax": "softmax",
-    "Squeeze": "squeeze",
-    "Transpose": "transpose",
-    "Unsqueeze": "unsqueeze",
-    # --- unary element-wise (identity shape) ---
-    "Abs": "abs",
-    "Acos": "acos",
-    "Acosh": "acosh",
-    "Asin": "asin",
-    "Asinh": "asinh",
-    "Atan": "atan",
-    "Atanh": "atanh",
-    "Bernoulli": "bernoulli",
-    "BitwiseNot": "bitwisenot",
-    "Cast": "cast",
-    "CastLike": "castlike",
-    "Ceil": "ceil",
-    "Celu": "celu",
-    "Clip": "clip",
-    "Cos": "cos",
-    "Cosh": "cosh",
-    "CumSum": "cumsum",
-    "DequantizeLinear": "dequantizelinear",
-    "Dropout": "dropout",
-    "Elu": "elu",
-    "Erf": "erf",
-    "Exp": "exp",
-    "EyeLike": "eyelike",
-    "Floor": "floor",
-    "Gelu": "gelu",
-    "HardSigmoid": "hardsigmoid",
-    "HardSwish": "hardswish",
-    "Hardmax": "hardmax",
-    "Identity": "identity",
-    "IsInf": "isinf",
-    "IsNaN": "isnan",
-    "LRN": "lrn",
-    "LeakyRelu": "leakyrelu",
-    "Log": "log",
-    "LogSoftmax": "logsoftmax",
-    "LpNormalization": "lpnormalization",
-    "MeanVarianceNormalization": "meanvariancenormalization",
-    "Mish": "mish",
-    "Neg": "neg",
-    "Not": "not",
-    "QuantizeLinear": "quantizelinear",
-    "Reciprocal": "reciprocal",
-    "ReverseSequence": "reversesequence",
-    "Round": "round",
-    "Selu": "selu",
-    "Shrink": "shrink",
-    "Sigmoid": "sigmoid",
-    "Sign": "sign",
-    "Sin": "sin",
-    "Sinh": "sinh",
-    "Softplus": "softplus",
-    "Softsign": "softsign",
-    "Sqrt": "sqrt",
-    "Swish": "swish",
-    "Tan": "tan",
-    "Tanh": "tanh",
-    "ThresholdedRelu": "thresholdedrelu",
-    "Trilu": "trilu",
-    # --- binary broadcasting ---
-    "And": "and",
-    "BitShift": "bitshift",
-    "BitwiseAnd": "bitwiseand",
-    "BitwiseOr": "bitwiseor",
-    "BitwiseXor": "bitwisexor",
-    "Div": "div",
-    "Equal": "equal",
-    "Greater": "greater",
-    "GreaterOrEqual": "greaterorequal",
-    "Less": "less",
-    "LessOrEqual": "lessorequal",
-    "Mod": "mod",
-    "Mul": "mul",
-    "Or": "or",
-    "PRelu": "prelu",
-    "Pow": "pow",
-    "Sub": "sub",
-    "Where": "where",
-    "Xor": "xor",
-    # --- variadic broadcasting ---
-    "Max": "max",
-    "Mean": "mean",
-    "Min": "min",
-    "Sum": "sum_op",
-    # --- normalization ---
-    "BatchNormalization": "batchnormalization",
-    "GroupNormalization": "groupnormalization",
-    "InstanceNormalization": "instancenormalization",
-    "LayerNormalization": "layernormalization",
-    "RMSNormalization": "rmsnormalization",
-    # --- reduction ---
-    "ArgMax": "argmax",
-    "ArgMin": "argmin",
-    "ReduceL1": "reducel1",
-    "ReduceL2": "reducel2",
-    "ReduceLogSum": "reducelogsum",
-    "ReduceLogSumExp": "reducelogsumexp",
-    "ReduceMax": "reducemax",
-    "ReduceMean": "reducemean",
-    "ReduceMin": "reducemin",
-    "ReduceProd": "reduceprod",
-    "ReduceSum": "reducesum",
-    "ReduceSumSquare": "reducesumsquare",
-    # --- pooling ---
-    "AveragePool": "averagepool",
-    "GlobalAveragePool": "globalaveragepool",
-    "GlobalMaxPool": "globalmaxpool",
-    "LpPool": "lppool",
-    "MaxPool": "maxpool",
-    # --- conv ---
-    "Conv": "conv",
-    "ConvTranspose": "convtranspose",
-    # --- gather / scatter ---
-    "GatherElements": "gatherelements",
-    "GatherND": "gathernd",
-    "Scatter": "scatter",
-    "ScatterElements": "scatterelements",
-    "ScatterND": "scatternd",
-    "TensorScatter": "tensorscatter",
-    # --- shape manipulation ---
-    "Compress": "compress",
-    "ConstantOfShape": "constantofshape",
-    "DepthToSpace": "depthtospace",
-    "Det": "det",
-    "Expand": "expand",
-    "OneHot": "onehot",
-    "Pad": "pad",
-    "Shape": "shape_op",
-    "Size": "size",
-    "Slice": "slice",
-    "SpaceToDepth": "spacetodepth",
-    "Split": "split",
-    "Tile": "tile",
-    "TopK": "topk",
-    "Unique": "unique",
-    # --- matmul variants ---
-    "MatMulInteger": "matmulinteger",
-    "QLinearMatMul": "qlinearmatmul",
-    # --- other ---
-    "Constant": "constant",
-    "Einsum": "einsum",
-    "Resize": "resize",
-    "Upsample": "upsample",
-    "NonMaxSuppression": "nonmaxsuppression",
-    "NegativeLogLikelihoodLoss": "negativeloglikelihoodloss",
-    "SoftmaxCrossEntropyLoss": "softmaxcrossentropyloss",
-    "RoiAlign": "roialign",
-    "MaxUnpool": "maxunpool",
-    "AffineGrid": "affinegrid",
-    "GridSample": "gridsample",
-    "GRU": "gru",
-    "LSTM": "lstm",
-    "RNN": "rnn",
-    "Range": "range_op",
-    "DFT": "dft",
-    "STFT": "stft",
-    "Col2Im": "col2im",
-}
-
 # Default attribute values for operators (used when the attribute is absent).
 _DEFAULT_ATTRS: dict[str, dict[str, Any]] = {
     "Flatten": {"axis": 1},
@@ -1321,11 +1176,6 @@ class OsclShapeInferenceEngine:
     def __init__(self) -> None:
         self._specs = load_all_specs()
 
-    @property
-    def supported_ops(self) -> set[str]:
-        """Set of ONNX op types supported by loaded OSCL specs."""
-        return set(_OP_TO_SPEC.keys())
-
     def infer_shapes(self, model: ModelProto) -> ModelProto:
         """Infer shapes for all nodes in *model*.
 
@@ -1354,7 +1204,7 @@ class OsclShapeInferenceEngine:
             known_elem_types[vi.name] = _get_elem_type(vi.type)
 
         # Initialiser shapes and values ----------------------------------------
-        initializer_values: dict[str, list[int]] = {}
+        initializer_values: dict[str, list[int | float]] = {}
         for init in graph.initializer:
             arr = numpy_helper.to_array(init)
             known_shapes[init.name] = list(arr.shape)
@@ -1367,23 +1217,28 @@ class OsclShapeInferenceEngine:
                 TensorProto.INT8,
             ):
                 initializer_values[init.name] = arr.flatten().astype(int).tolist()
-            # Also extract scalar float values for operators like OneHot that
-            # need the integer value of a float-typed depth tensor.
-            elif arr.ndim == 0 and init.data_type in (
+            # Also extract float values for operators that need them
+            # (e.g. Resize/Upsample scales, Range start/limit/delta).
+            elif init.data_type in (
                 TensorProto.FLOAT,
                 TensorProto.DOUBLE,
                 TensorProto.FLOAT16,
             ):
-                val = arr.item()
-                if val == int(val):
-                    initializer_values[init.name] = [int(val)]
+                flat = arr.flatten().tolist()
+                # Skip tensors containing NaN / Inf values.
+                if any(math.isnan(v) or math.isinf(v) for v in flat):
+                    continue
+                # Store integer-valued floats as int for compatibility
+                initializer_values[init.name] = [
+                    int(v) if v == int(v) else v for v in flat
+                ]
 
         # Forward pass: infer shapes node by node -----------------------------
         value_info_names = {vi.name for vi in graph.value_info}
 
         for node in graph.node:
-            spec_name = _OP_TO_SPEC.get(node.op_type)
-            if spec_name is None or spec_name not in self._specs:
+            spec_name = node.op_type.lower()
+            if spec_name not in self._specs:
                 continue
 
             spec = self._specs[spec_name]

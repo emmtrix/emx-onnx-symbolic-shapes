@@ -15,12 +15,16 @@ from __future__ import annotations
 
 import copy
 import importlib
+import os
+import pkgutil
 import sys
 import warnings
 from typing import Any
 
 import numpy as np
 import onnx
+import onnx.backend.test.case.node as _onnx_node_mod
+import onnx.defs
 import pytest
 from onnx import ModelProto, TensorProto, helper, numpy_helper, shape_inference
 
@@ -37,168 +41,55 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"numpy\.")
 # Singleton engine (avoids re-parsing specs for every test case).
 _ENGINE = OsclShapeInferenceEngine()
 
-# Operators for which we ship OSCL specs.
-_SUPPORTED_OPS: dict[str, str] = {
-    # --- originally supported ---
-    "Add": "add",
-    "Concat": "concat",
-    "Flatten": "flatten",
-    "Gather": "gather",
-    "Gemm": "gemm",
-    "MatMul": "matmul",
-    "NonZero": "nonzero",
-    "Relu": "relu",
-    "Reshape": "reshape",
-    "Softmax": "softmax",
-    "Squeeze": "squeeze",
-    "Transpose": "transpose",
-    "Unsqueeze": "unsqueeze",
-    # --- unary element-wise (identity shape) ---
-    "Abs": "abs",
-    "Acos": "acos",
-    "Acosh": "acosh",
-    "Asin": "asin",
-    "Asinh": "asinh",
-    "Atan": "atan",
-    "Atanh": "atanh",
-    "BitwiseNot": "bitwisenot",
-    "Cast": "cast",
-    "CastLike": "castlike",
-    "Ceil": "ceil",
-    "Celu": "celu",
-    "Clip": "clip",
-    "Cos": "cos",
-    "Cosh": "cosh",
-    "CumSum": "cumsum",
-    "DequantizeLinear": "dequantizelinear",
-    "Dropout": "dropout",
-    "Elu": "elu",
-    "Erf": "erf",
-    "Exp": "exp",
-    "EyeLike": "eyelike",
-    "Floor": "floor",
-    "Gelu": "gelu",
-    "HardSigmoid": "hardsigmoid",
-    "HardSwish": "hardswish",
-    "Hardmax": "hardmax",
-    "Identity": "identity",
-    "IsInf": "isinf",
-    "IsNaN": "isnan",
-    "LRN": "lrn",
-    "LeakyRelu": "leakyrelu",
-    "Log": "log",
-    "LogSoftmax": "logsoftmax",
-    "LpNormalization": "lpnormalization",
-    "MeanVarianceNormalization": "meanvariancenormalization",
-    "Mish": "mish",
-    "Neg": "neg",
-    "Not": "not",
-    "QuantizeLinear": "quantizelinear",
-    "Reciprocal": "reciprocal",
-    "Round": "round",
-    "Selu": "selu",
-    "Shrink": "shrink",
-    "Sigmoid": "sigmoid",
-    "Sign": "sign",
-    "Sin": "sin",
-    "Sinh": "sinh",
-    "Softplus": "softplus",
-    "Softsign": "softsign",
-    "Sqrt": "sqrt",
-    "Swish": "swish",
-    "Tan": "tan",
-    "Tanh": "tanh",
-    "ThresholdedRelu": "thresholdedrelu",
-    "Trilu": "trilu",
-    # --- binary broadcasting ---
-    "And": "and",
-    "BitShift": "bitshift",
-    "BitwiseAnd": "bitwiseand",
-    "BitwiseOr": "bitwiseor",
-    "BitwiseXor": "bitwisexor",
-    "Div": "div",
-    "Equal": "equal",
-    "Greater": "greater",
-    "GreaterOrEqual": "greater_equal",
-    "Less": "less",
-    "LessOrEqual": "less_equal",
-    "Mod": "mod",
-    "Mul": "mul",
-    "Or": "or",
-    "PRelu": "prelu",
-    "Pow": "pow",
-    "Sub": "sub",
-    "Where": "where",
-    "Xor": "xor",
-    # --- variadic broadcasting ---
-    "Max": "max",
-    "Mean": "mean",
-    "Min": "min",
-    "Sum": "sum",
-    # --- normalization ---
+# ---------------------------------------------------------------------------
+# Auto-discovery: ONNX op_type ↔ spec name ↔ ONNX test module name
+# ---------------------------------------------------------------------------
+
+# Reverse lookup: spec name (lowercase) → ONNX op_type (CamelCase), built
+# from the ONNX operator schema registry.
+_SPEC_TO_OP_TYPE: dict[str, str] = {}
+for _schema in onnx.defs.get_all_schemas_with_history():
+    _SPEC_TO_OP_TYPE[_schema.name.lower()] = _schema.name
+
+# Set of available ONNX node-test modules (discovered once at import time).
+_ONNX_TEST_MODULES: set[str] = {
+    name
+    for _, name, _ in pkgutil.iter_modules(
+        [os.path.dirname(_onnx_node_mod.__file__)]
+    )
+}
+
+# The ONNX test module name *usually* equals ``op_type.lower()`` but a few
+# operators deviate.  This small table covers those exceptions.
+_ONNX_TEST_MODULE_OVERRIDES: dict[str, str] = {
     "BatchNormalization": "batchnorm",
-    "GroupNormalization": "groupnormalization",
+    "GreaterOrEqual": "greater_equal",
     "InstanceNormalization": "instancenorm",
-    "LayerNormalization": "layernormalization",
-    # --- reduction ---
-    "ArgMax": "argmax",
-    "ArgMin": "argmin",
-    "ReduceL1": "reducel1",
-    "ReduceL2": "reducel2",
+    "LessOrEqual": "less_equal",
+    "Range": "rangeop",
     "ReduceLogSum": "reduce_log_sum",
     "ReduceLogSumExp": "reduce_log_sum_exp",
-    "ReduceMax": "reducemax",
-    "ReduceMean": "reducemean",
-    "ReduceMin": "reducemin",
-    "ReduceProd": "reduceprod",
-    "ReduceSum": "reducesum",
-    "ReduceSumSquare": "reducesumsquare",
-    # --- pooling ---
-    "AveragePool": "averagepool",
-    "GlobalAveragePool": "globalaveragepool",
-    "GlobalMaxPool": "globalmaxpool",
-    "LpPool": "lppool",
-    "MaxPool": "maxpool",
-    # --- conv ---
-    "Conv": "conv",
-    "ConvTranspose": "convtranspose",
-    # --- gather / scatter ---
-    "GatherElements": "gatherelements",
-    "GatherND": "gathernd",
-    "ScatterElements": "scatterelements",
-    "ScatterND": "scatternd",
-    # --- shape manipulation ---
-    "ConstantOfShape": "constantofshape",
-    "DepthToSpace": "depthtospace",
-    "Det": "det",
-    "Expand": "expand",
-    "OneHot": "onehot",
-    "Pad": "pad",
-    "Shape": "shape",
-    "Size": "size",
-    "Slice": "slice",
-    "SpaceToDepth": "spacetodepth",
-    "Split": "split",
-    "Tile": "tile",
-    "TopK": "topk",
-    # --- matmul variants ---
-    "MatMulInteger": "matmulinteger",
-    # --- other ---
-    "Constant": "constant",
-    "Einsum": "einsum",
-    "NegativeLogLikelihoodLoss": "negativeloglikelihoodloss",
     "SoftmaxCrossEntropyLoss": "softmaxcrossentropy",
 }
 
 
-def _collect_onnx_node_tests(op_type: str) -> list[Any]:
+def _onnx_test_module_name(op_type: str) -> str | None:
+    """Return the ONNX backend test module name for *op_type*, or ``None``."""
+    if op_type in _ONNX_TEST_MODULE_OVERRIDES:
+        return _ONNX_TEST_MODULE_OVERRIDES[op_type]
+    candidate = op_type.lower()
+    if candidate in _ONNX_TEST_MODULES:
+        return candidate
+    return None
+
+
+def _collect_onnx_node_tests(op_type: str, mod_name: str) -> list[Any]:
     """Import and collect the official ONNX node test cases for *op_type*."""
     import onnx.backend.test.case.node as nmod
 
     nmod._NodeTestCases = []
     nmod._TargetOpType = op_type
 
-    mod_name = _SUPPORTED_OPS[op_type]
     mod_path = f"onnx.backend.test.case.node.{mod_name}"
     # Force re-import so the global target is respected.
     if mod_path in sys.modules:
@@ -241,15 +132,16 @@ def _inject_constant_inputs(
         # Only inject integer tensors that aren't already initializers.
         if name in existing_init_names:
             continue
-        if arr.dtype.kind not in ("i", "u"):
-            # Also inject scalar float tensors (e.g., OneHot depth)
-            if arr.ndim == 0 and arr.dtype.kind == "f":
+        if arr.dtype.kind in ("i", "u"):
+            tensor = numpy_helper.from_array(arr, name=name)
+            graph.initializer.append(tensor)
+        elif arr.dtype.kind == "f":
+            # Inject small float tensors (scalars and short vectors) needed by
+            # operators like Resize/Upsample (scales), Range (start/limit/delta).
+            # Skip large data tensors to avoid injecting NaN/Inf test values.
+            if arr.size <= 16:
                 tensor = numpy_helper.from_array(arr, name=name)
                 graph.initializer.append(tensor)
-            continue
-
-        tensor = numpy_helper.from_array(arr, name=name)
-        graph.initializer.append(tensor)
 
     return model
 
@@ -276,14 +168,54 @@ _XFAIL_CASES: set[str] = {
     # Einsum: ellipsis / scalar cases not fully supported yet.
     "test_einsum_batch_diagonal",
     "test_einsum_inner_prod",
+    # Compress: output dimension is data-dependent (depends on condition values).
+    "test_compress_0",
+    "test_compress_1",
+    "test_compress_default_axis",
+    "test_compress_negative_axis",
+    # NonMaxSuppression: first output dim is data-dependent (selected boxes).
+    "test_nonmaxsuppression_suppress_by_IOU",
+    "test_nonmaxsuppression_suppress_by_IOU_and_scores",
+    "test_nonmaxsuppression_flipped_coordinates",
+    "test_nonmaxsuppression_limit_output_size",
+    "test_nonmaxsuppression_single_box",
+    "test_nonmaxsuppression_identical_boxes",
+    "test_nonmaxsuppression_center_point_box_format",
+    "test_nonmaxsuppression_two_classes",
+    "test_nonmaxsuppression_two_batches",
+    # Unique: output dimension is data-dependent (unique element count).
+    "test_unique_sorted_without_axis",
+    "test_unique_not_sorted_without_axis",
+    "test_unique_sorted_with_axis",
+    "test_unique_sorted_with_axis_3d",
+    "test_unique_sorted_with_negative_axis",
+    "test_unique_length_1",
+    # Resize with axes attribute or keep_aspect_ratio_policy not yet supported.
+    "test_resize_upsample_scales_nearest_axes_2_3",
+    "test_resize_upsample_scales_nearest_axes_3_2",
+    "test_resize_upsample_sizes_nearest_axes_2_3",
+    "test_resize_upsample_sizes_nearest_axes_3_2",
+    "test_resize_tf_crop_and_resize_axes_2_3",
+    "test_resize_tf_crop_and_resize_axes_3_2",
+    "test_resize_upsample_sizes_nearest_not_larger",
+    "test_resize_upsample_sizes_nearest_not_smaller",
+    "test_resize_downsample_sizes_nearest_not_larger",
+    "test_resize_downsample_sizes_nearest_not_smaller",
 }
 
 
 def _build_test_params() -> list[pytest.param]:
-    """Collect parametrized test entries for every supported operator."""
+    """Collect parametrized test entries for every operator that has both an
+    OSCL spec file and an ONNX backend test module."""
     params: list[pytest.param] = []
-    for op_type in sorted(_SUPPORTED_OPS):
-        cases = _collect_onnx_node_tests(op_type)
+    for spec_name in sorted(_ENGINE._specs):
+        op_type = _SPEC_TO_OP_TYPE.get(spec_name)
+        if op_type is None:
+            continue  # no matching ONNX schema
+        mod_name = _onnx_test_module_name(op_type)
+        if mod_name is None:
+            continue  # no ONNX test module available
+        cases = _collect_onnx_node_tests(op_type, mod_name)
         for tc in cases:
             # Some test cases use expanded sub-graphs with many nodes; we only
             # keep single-node tests whose op_type matches.
@@ -347,13 +279,19 @@ def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
 
 
 def test_collected_test_count() -> None:
-    """We must have at least one test case per supported operator."""
+    """We must have at least one test case per spec that has an ONNX test module."""
     ops_seen: set[str] = set()
     for p in _TEST_PARAMS:
         # The op_type is the second positional value in the param.
         ops_seen.add(p.values[1])
-    for op in _SUPPORTED_OPS:
-        assert op in ops_seen, f"No test cases collected for {op}"
+    for spec_name in sorted(_ENGINE._specs):
+        op_type = _SPEC_TO_OP_TYPE.get(spec_name)
+        if op_type is None:
+            continue
+        mod_name = _onnx_test_module_name(op_type)
+        if mod_name is None:
+            continue
+        assert op_type in ops_seen, f"No test cases collected for {op_type}"
 
 
 # ---------------------------------------------------------------------------
@@ -532,7 +470,3 @@ class TestEngineBasic:
         m = self._simple_model("Relu", [[2, 3]])
         result = oscl_infer_shapes(m)
         assert isinstance(result, ModelProto)
-
-    def test_supported_ops(self) -> None:
-        """Engine reports all expected operators as supported."""
-        assert set(_SUPPORTED_OPS.keys()).issubset(_ENGINE.supported_ops)

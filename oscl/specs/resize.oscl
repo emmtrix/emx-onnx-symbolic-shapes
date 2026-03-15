@@ -2,5 +2,8 @@ shape {
   inputs X, roi, scales, sizes;
   outputs Y;
 
-  result Y = resize_shape(shape(X), scales, sizes);
+  let sc = shape_value(scales);
+  let sz = shape_value(sizes);
+
+  result Y = resize_shape(shape(X), sc, sz);
 }

@@ -2,5 +2,8 @@ shape {
   inputs data, image_shape, block_shape;
   outputs output;
 
-  result output = col2im_shape(shape(data), image_shape, block_shape);
+  let img = shape_value(image_shape);
+  let blk = shape_value(block_shape);
+
+  result output = col2im_shape(shape(data), img, blk);
 }
