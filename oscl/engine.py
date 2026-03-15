@@ -463,6 +463,24 @@ def _execute_spec(
     return results
 
 
+def _merge_shapes(
+    inferred: list[int | None],
+    existing: list[int | None] | None,
+) -> list[int | None]:
+    """Merge *inferred* with *existing* shape, keeping concrete dims.
+
+    Where the OSCL spec produces an unknown dimension (``None``) the
+    pre-existing concrete value from *existing* is preserved.  This
+    implements partial-inference merging (RFC §11).
+    """
+    if existing is not None and len(existing) == len(inferred):
+        return [
+            d if d is not None else existing[i]
+            for i, d in enumerate(inferred)
+        ]
+    return inferred
+
+
 # ---------------------------------------------------------------------------
 # ONNX helper utilities
 # ---------------------------------------------------------------------------
@@ -700,14 +718,9 @@ class OsclShapeInferenceEngine:
                     onnx_out = node.output[j]
                     inferred = output_shapes.get(out_name)
                     if inferred is not None:
-                        # Merge: keep pre-existing concrete dims where
-                        # the spec produces unknown (partial inference).
-                        existing = known_shapes.get(onnx_out)
-                        if existing is not None and len(existing) == len(inferred):
-                            inferred = [
-                                d if d is not None else existing[i]
-                                for i, d in enumerate(inferred)
-                            ]
+                        inferred = _merge_shapes(
+                            inferred, known_shapes.get(onnx_out)
+                        )
                         known_shapes[onnx_out] = inferred
 
                         # Determine element type (inherit from first input)
@@ -730,14 +743,9 @@ class OsclShapeInferenceEngine:
         for out in graph.output:
             if out.name in known_shapes:
                 inferred = known_shapes[out.name]
-                # Merge: keep pre-existing concrete dims where
-                # inference produces unknown (partial inference).
-                existing = _get_shape_from_type(out.type)
-                if existing is not None and len(existing) == len(inferred):
-                    inferred = [
-                        d if d is not None else existing[i]
-                        for i, d in enumerate(inferred)
-                    ]
+                inferred = _merge_shapes(
+                    inferred, _get_shape_from_type(out.type)
+                )
                 et = known_elem_types.get(out.name, _get_elem_type(out.type))
                 out.type.CopyFrom(_make_type_proto(inferred, et))
 
