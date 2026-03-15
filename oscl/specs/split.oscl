@@ -1,0 +1,10 @@
+shape {
+  inputs input, split_sizes;
+  outputs output;
+  attributes axis, num_outputs;
+
+  let ax = normalize_axis(axis, rank(input));
+  let sizes = shape_value(split_sizes);
+
+  result output = split_shape(shape(input), ax, sizes);
+}

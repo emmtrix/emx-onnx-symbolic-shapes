@@ -1,0 +1,6 @@
+shape {
+  inputs input, condition;
+  outputs output;
+
+  result output = [unknown_nonnegative()];
+}

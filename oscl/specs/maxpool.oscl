@@ -1,0 +1,8 @@
+shape {
+  inputs X;
+  outputs Y, Indices;
+  attributes kernel_shape, strides, pads, dilations, ceil_mode, auto_pad, storage_order;
+
+  result Y = pool_shape(shape(X), kernel_shape, strides, pads, dilations, ceil_mode, auto_pad);
+  result Indices = pool_shape(shape(X), kernel_shape, strides, pads, dilations, ceil_mode, auto_pad);
+}

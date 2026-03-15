@@ -1,0 +1,6 @@
+shape {
+  inputs data, indices;
+  outputs output;
+
+  result output = shape(indices);
+}

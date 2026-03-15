@@ -1,0 +1,8 @@
+shape {
+  inputs input, repeats;
+  outputs output;
+
+  let reps = shape_value(repeats);
+
+  result output = tile_shape(shape(input), reps);
+}

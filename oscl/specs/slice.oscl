@@ -1,0 +1,11 @@
+shape {
+  inputs data, starts, ends, axes, steps;
+  outputs output;
+
+  let s = shape_value(starts);
+  let e = shape_value(ends);
+  let ax = shape_value(axes);
+  let st = shape_value(steps);
+
+  result output = slice_shape(shape(data), s, e, ax, st);
+}

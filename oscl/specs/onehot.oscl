@@ -1,0 +1,10 @@
+shape {
+  inputs indices, depth, values;
+  outputs output;
+  attributes axis;
+
+  let d = shape_value(depth);
+  let ax = normalize_axis(axis, rank(indices) + 1);
+
+  result output = onehot_shape(shape(indices), d, ax);
+}

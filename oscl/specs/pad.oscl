@@ -1,0 +1,8 @@
+shape {
+  inputs data, pads;
+  outputs output;
+
+  let pad_vals = shape_value(pads);
+
+  result output = pad_shape(shape(data), pad_vals);
+}

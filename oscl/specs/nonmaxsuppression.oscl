@@ -1,0 +1,6 @@
+shape {
+  inputs boxes, scores;
+  outputs selected_indices;
+
+  result selected_indices = [unknown_nonnegative(), 3];
+}

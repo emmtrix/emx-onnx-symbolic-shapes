@@ -107,10 +107,11 @@ class _Parser:
     def _parse_input_decl(self) -> list[InputDecl]:
         self._expect(TokenType.INPUTS)
         decls: list[InputDecl] = []
-        decls.append(self._parse_one_input())
-        while self._peek(TokenType.COMMA):
-            self._advance()
+        if not self._peek(TokenType.SEMICOLON):
             decls.append(self._parse_one_input())
+            while self._peek(TokenType.COMMA):
+                self._advance()
+                decls.append(self._parse_one_input())
         self._expect(TokenType.SEMICOLON)
         return decls
 

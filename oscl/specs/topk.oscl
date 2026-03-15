@@ -1,0 +1,11 @@
+shape {
+  inputs X, K;
+  outputs Values, Indices;
+  attributes axis;
+
+  let ax = normalize_axis(axis, rank(X));
+  let k_val = shape_value(K);
+
+  result Values = topk_shape(shape(X), ax, k_val);
+  result Indices = topk_shape(shape(X), ax, k_val);
+}
