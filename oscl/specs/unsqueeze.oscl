@@ -1,0 +1,8 @@
+shape {
+  inputs data, axes;
+  outputs expanded;
+
+  let target_axes = shape_value(axes);
+
+  result expanded = unsqueeze_shape(shape(data), target_axes);
+}

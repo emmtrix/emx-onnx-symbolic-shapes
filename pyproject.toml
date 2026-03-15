@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oscl"
+version = "0.1.0"
+description = "Reference implementation of OSCL (ONNX Shape Constraint Language)"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["oscl*"]
+
+[tool.setuptools.package-data]
+oscl = ["specs/*.oscl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

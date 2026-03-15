@@ -1,0 +1,7 @@
+shape {
+  inputs data;
+  outputs transposed;
+  attributes perm;
+
+  result transposed = permute(shape(data), perm);
+}

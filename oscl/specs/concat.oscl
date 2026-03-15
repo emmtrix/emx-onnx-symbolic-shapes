@@ -1,0 +1,13 @@
+shape {
+  inputs Xs[];
+  outputs Y;
+  attributes axis;
+
+  let ax = normalize_axis(axis, rank(Xs[0]));
+
+  result Y =
+    map j in range(rank(Xs[0])):
+      if j == ax
+        then sum(map i in Xs: dim(i,j))
+        else dim(Xs[0],j);
+}

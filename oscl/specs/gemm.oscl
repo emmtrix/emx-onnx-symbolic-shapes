@@ -1,0 +1,14 @@
+shape {
+  inputs A, B, C;
+  outputs Y;
+  attributes transA, transB;
+
+  let m = if transA then dim(A,-1) else dim(A,-2);
+  let k1 = if transA then dim(A,-2) else dim(A,-1);
+  let k2 = if transB then dim(B,-1) else dim(B,-2);
+  let n = if transB then dim(B,-2) else dim(B,-1);
+
+  require k1 == k2;
+
+  result Y = [m, n];
+}
