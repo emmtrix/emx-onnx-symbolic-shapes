@@ -742,12 +742,12 @@ def _builtin_stft_shape(args: list[Any]) -> list[int | None]:
     # frame_step is a scalar tensor value passed via shape_value()
     step: int | None = None
     if isinstance(frame_step_vals, list) and len(frame_step_vals) == 1:
-        step = int(frame_step_vals[0])
+        step = int(float(frame_step_vals[0]))
 
     # num_frames = (signal_length - frame_length) / frame_step + 1
     num_frames: int | None = None
     if signal_length is not None and frame_length is not None and step:
-        num_frames = (signal_length - frame_length) // step + 1
+        num_frames = max(0, (signal_length - frame_length) // step + 1)
 
     # fft_length depends on onesided flag
     fft_length: int | None = None

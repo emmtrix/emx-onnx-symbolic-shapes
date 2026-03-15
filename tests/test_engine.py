@@ -60,7 +60,9 @@ _ONNX_TEST_MODULES: set[str] = {
 }
 
 # The ONNX test module name *usually* equals ``op_type.lower()`` but a few
-# operators deviate.  This small table covers those exceptions.
+# operators deviate.  This small table maps ONNX op_type to the actual ONNX
+# backend test module name where the two differ (e.g. "Range" uses "rangeop"
+# because "range" conflicts with the Python built-in).
 _ONNX_TEST_MODULE_OVERRIDES: dict[str, str] = {
     "BatchNormalization": "batchnorm",
     "GreaterOrEqual": "greater_equal",
@@ -102,13 +104,18 @@ def _inject_constant_inputs(
     model: ModelProto,
     input_arrays: list[np.ndarray],
 ) -> ModelProto:
-    """Return a copy of *model* with integer input tensors added as initializers.
+    """Return a copy of *model* with input tensors added as initializers.
 
     Operators like Reshape, Squeeze and Unsqueeze read shape-valued inputs at
     inference time.  The ONNX test cases provide these values only via
     ``data_sets``; to allow *static* shape inference we inject them as
     graph initializers.
     """
+    # Maximum number of elements in a float tensor to inject as initializer.
+    # Shape-relevant float tensors (scales, sizes, etc.) are typically small;
+    # large data tensors may contain NaN/Inf test values we don't want.
+    _MAX_FLOAT_INIT_ELEMS = 16
+
     model = copy.deepcopy(model)
     graph = model.graph
 
@@ -129,19 +136,16 @@ def _inject_constant_inputs(
         if not isinstance(arr, np.ndarray):
             continue
 
-        # Only inject integer tensors that aren't already initializers.
         if name in existing_init_names:
             continue
         if arr.dtype.kind in ("i", "u"):
             tensor = numpy_helper.from_array(arr, name=name)
             graph.initializer.append(tensor)
-        elif arr.dtype.kind == "f":
+        elif arr.dtype.kind == "f" and arr.size <= _MAX_FLOAT_INIT_ELEMS:
             # Inject small float tensors (scalars and short vectors) needed by
             # operators like Resize/Upsample (scales), Range (start/limit/delta).
-            # Skip large data tensors to avoid injecting NaN/Inf test values.
-            if arr.size <= 16:
-                tensor = numpy_helper.from_array(arr, name=name)
-                graph.initializer.append(tensor)
+            tensor = numpy_helper.from_array(arr, name=name)
+            graph.initializer.append(tensor)
 
     return model
 
