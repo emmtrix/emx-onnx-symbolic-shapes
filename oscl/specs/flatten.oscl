@@ -1,0 +1,9 @@
+shape {
+  inputs input;
+  outputs output;
+  attributes axis;
+
+  let ax = normalize_axis(axis, rank(input));
+
+  result output = [prod(prefix(input, ax)), prod(suffix(input, ax))];
+}

@@ -1,0 +1,10 @@
+shape {
+  inputs A, B;
+  outputs Y;
+
+  require dim(A,-1) == dim(B,-2);
+
+  let batch = broadcast(prefix(A,-2), prefix(B,-2));
+
+  result Y = concat(batch, [dim(A,-2), dim(B,-1)]);
+}

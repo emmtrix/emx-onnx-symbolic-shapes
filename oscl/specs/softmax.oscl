@@ -1,0 +1,6 @@
+shape {
+  inputs input;
+  outputs output;
+
+  result output = shape(input);
+}
