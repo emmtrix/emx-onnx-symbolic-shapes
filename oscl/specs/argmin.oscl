@@ -1,0 +1,7 @@
+shape {
+  inputs data;
+  outputs reduced;
+  attributes axis, keepdims;
+
+  result reduced = reduce_shape(shape(data), [axis], keepdims);
+}
