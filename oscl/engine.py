@@ -1367,13 +1367,16 @@ class OsclShapeInferenceEngine:
                 TensorProto.INT8,
             ):
                 initializer_values[init.name] = arr.flatten().astype(int).tolist()
-            # Also extract scalar float values as ints (e.g., OneHot depth)
+            # Also extract scalar float values for operators like OneHot that
+            # need the integer value of a float-typed depth tensor.
             elif arr.ndim == 0 and init.data_type in (
                 TensorProto.FLOAT,
                 TensorProto.DOUBLE,
                 TensorProto.FLOAT16,
             ):
-                initializer_values[init.name] = [int(arr.item())]
+                val = arr.item()
+                if val == int(val):
+                    initializer_values[init.name] = [int(val)]
 
         # Forward pass: infer shapes node by node -----------------------------
         value_info_names = {vi.name for vi in graph.value_info}
@@ -1741,20 +1744,14 @@ class OsclShapeInferenceEngine:
     ) -> None:
         """Prepare Resize inputs (scales or sizes) for spec evaluation."""
         # Resize inputs: X, roi, scales, sizes
-        # Get scales from initializer (may be float)
         if len(node.input) >= 3 and node.input[2]:
             scales_name = node.input[2]
-            # Try to get float values from initializer
-            for init in []:  # handled below
-                pass
-            if scales_name not in tensor_vals:
-                tensor_vals.setdefault("scales", [])
+            if scales_name in initializer_values:
+                tensor_vals["scales"] = initializer_values[scales_name]
         if len(node.input) >= 4 and node.input[3]:
             sizes_name = node.input[3]
             if sizes_name in initializer_values:
                 tensor_vals["sizes"] = initializer_values[sizes_name]
-            elif sizes_name not in tensor_vals:
-                tensor_vals.setdefault("sizes", [])
         # Ensure both keys exist
         tensor_vals.setdefault("scales", [])
         tensor_vals.setdefault("sizes", [])
