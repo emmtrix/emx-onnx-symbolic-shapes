@@ -1,0 +1,8 @@
+shape {
+  inputs theta, size;
+  outputs grid;
+
+  let sz = shape_value(size);
+
+  result grid = affinegrid_shape(shape(theta), sz);
+}

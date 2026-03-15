@@ -1,0 +1,6 @@
+shape {
+  inputs X, scales;
+  outputs Y;
+
+  result Y = resize_shape(shape(X), scales, []);
+}

@@ -1,0 +1,7 @@
+shape {
+  inputs signal, frame_step, window;
+  outputs output;
+  attributes onesided;
+
+  result output = stft_shape(shape(signal), frame_step, window, onesided);
+}

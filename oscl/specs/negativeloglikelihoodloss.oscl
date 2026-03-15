@@ -1,0 +1,7 @@
+shape {
+  inputs input, target;
+  outputs loss;
+  attributes reduction;
+
+  result loss = nll_loss_shape(shape(input), shape(target), reduction);
+}

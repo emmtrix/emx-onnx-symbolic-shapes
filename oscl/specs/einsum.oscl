@@ -1,0 +1,7 @@
+shape {
+  inputs Xs[];
+  outputs Y;
+  attributes equation;
+
+  result Y = einsum_shape(Xs, equation);
+}

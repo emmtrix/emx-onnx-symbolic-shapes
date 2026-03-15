@@ -1,0 +1,8 @@
+shape {
+  inputs scores, labels;
+  outputs output, log_prob;
+  attributes reduction;
+
+  result output = nll_loss_shape(shape(scores), shape(labels), reduction);
+  result log_prob = shape(scores);
+}

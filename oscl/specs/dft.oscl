@@ -1,0 +1,7 @@
+shape {
+  inputs input;
+  outputs output;
+  attributes axis, inverse, onesided;
+
+  result output = dft_shape(shape(input), axis, onesided);
+}

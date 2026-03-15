@@ -1,0 +1,6 @@
+shape {
+  inputs data, image_shape, block_shape;
+  outputs output;
+
+  result output = col2im_shape(shape(data), image_shape, block_shape);
+}
