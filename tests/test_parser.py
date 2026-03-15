@@ -168,7 +168,7 @@ class TestExpressions:
         assert isinstance(expr.left, BinOp)
         assert expr.left.op == "+"
 
-    def test_arithmetic_subtraction(self) -> None:
+    def test_arithmetic_addition(self) -> None:
         spec = parse("shape { let x = ax + 1; }")
         expr = spec.statements[0].expr
         assert isinstance(expr, BinOp)

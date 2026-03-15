@@ -214,16 +214,24 @@ def tokenize(source: str) -> list[Token]:
         two = source[i : i + 2] if i + 1 < length else ""
         if two == "==":
             tokens.append(Token(TokenType.EQ, "==", line, start_col))
-            i += 2; col += 2; continue
+            i += 2
+            col += 2
+            continue
         if two == "!=":
             tokens.append(Token(TokenType.NEQ, "!=", line, start_col))
-            i += 2; col += 2; continue
+            i += 2
+            col += 2
+            continue
         if two == "<=":
             tokens.append(Token(TokenType.LTE, "<=", line, start_col))
-            i += 2; col += 2; continue
+            i += 2
+            col += 2
+            continue
         if two == ">=":
             tokens.append(Token(TokenType.GTE, ">=", line, start_col))
-            i += 2; col += 2; continue
+            i += 2
+            col += 2
+            continue
 
         # --- single-character tokens ---
         singles: dict[str, TokenType] = {
@@ -246,7 +254,9 @@ def tokenize(source: str) -> list[Token]:
         }
         if ch in singles:
             tokens.append(Token(singles[ch], ch, line, start_col))
-            i += 1; col += 1; continue
+            i += 1
+            col += 1
+            continue
 
         raise LexError(f"Unexpected character {ch!r}", line, start_col)
 
