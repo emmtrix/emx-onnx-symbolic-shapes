@@ -1,0 +1,7 @@
+shape {
+  inputs data;
+  outputs output, mask;
+
+  result output = shape(data);
+  result mask = shape(data);
+}
