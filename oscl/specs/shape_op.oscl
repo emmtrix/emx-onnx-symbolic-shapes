@@ -1,0 +1,6 @@
+shape {
+  inputs data;
+  outputs output;
+
+  result output = [rank(data)];
+}

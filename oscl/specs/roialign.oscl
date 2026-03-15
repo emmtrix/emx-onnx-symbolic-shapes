@@ -1,0 +1,7 @@
+shape {
+  inputs X, rois, batch_indices;
+  outputs Y;
+  attributes output_height, output_width;
+
+  result Y = roialign_shape(shape(X), shape(rois), output_height, output_width);
+}

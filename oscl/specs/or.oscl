@@ -1,0 +1,6 @@
+shape {
+  inputs A, B;
+  outputs C;
+
+  result C = broadcast(shape(A), shape(B));
+}

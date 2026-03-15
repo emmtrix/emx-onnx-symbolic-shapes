@@ -1,0 +1,6 @@
+shape {
+  inputs start, limit, delta;
+  outputs output;
+
+  result output = range_output_shape(start, limit, delta);
+}

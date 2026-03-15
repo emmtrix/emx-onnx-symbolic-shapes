@@ -1,0 +1,7 @@
+shape {
+  inputs input;
+  outputs output;
+  attributes blocksize;
+
+  result output = depthtospace_shape(shape(input), blocksize);
+}

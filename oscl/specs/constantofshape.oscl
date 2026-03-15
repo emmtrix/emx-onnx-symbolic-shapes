@@ -1,0 +1,8 @@
+shape {
+  inputs input;
+  outputs output;
+
+  let target = shape_value(input);
+
+  result output = target;
+}

@@ -1,0 +1,6 @@
+shape {
+  inputs X;
+  outputs Y;
+
+  result Y = prefix(X, -2);
+}

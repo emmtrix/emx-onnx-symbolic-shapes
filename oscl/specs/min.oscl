@@ -1,0 +1,6 @@
+shape {
+  inputs Xs[];
+  outputs Y;
+
+  result Y = shape(Xs[0]);
+}

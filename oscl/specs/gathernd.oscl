@@ -1,0 +1,7 @@
+shape {
+  inputs data, indices;
+  outputs output;
+  attributes batch_dims;
+
+  result output = gathernd_shape(shape(data), shape(indices), batch_dims);
+}

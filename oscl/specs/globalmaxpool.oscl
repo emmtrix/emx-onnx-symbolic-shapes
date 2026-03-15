@@ -1,0 +1,6 @@
+shape {
+  inputs X;
+  outputs Y;
+
+  result Y = global_pool_shape(shape(X));
+}

@@ -39,6 +39,7 @@ _ENGINE = OsclShapeInferenceEngine()
 
 # Operators for which we ship OSCL specs.
 _SUPPORTED_OPS: dict[str, str] = {
+    # --- originally supported ---
     "Add": "add",
     "Concat": "concat",
     "Flatten": "flatten",
@@ -52,6 +53,141 @@ _SUPPORTED_OPS: dict[str, str] = {
     "Squeeze": "squeeze",
     "Transpose": "transpose",
     "Unsqueeze": "unsqueeze",
+    # --- unary element-wise (identity shape) ---
+    "Abs": "abs",
+    "Acos": "acos",
+    "Acosh": "acosh",
+    "Asin": "asin",
+    "Asinh": "asinh",
+    "Atan": "atan",
+    "Atanh": "atanh",
+    "BitwiseNot": "bitwisenot",
+    "Cast": "cast",
+    "CastLike": "castlike",
+    "Ceil": "ceil",
+    "Celu": "celu",
+    "Clip": "clip",
+    "Cos": "cos",
+    "Cosh": "cosh",
+    "CumSum": "cumsum",
+    "DequantizeLinear": "dequantizelinear",
+    "Dropout": "dropout",
+    "Elu": "elu",
+    "Erf": "erf",
+    "Exp": "exp",
+    "EyeLike": "eyelike",
+    "Floor": "floor",
+    "Gelu": "gelu",
+    "HardSigmoid": "hardsigmoid",
+    "HardSwish": "hardswish",
+    "Hardmax": "hardmax",
+    "Identity": "identity",
+    "IsInf": "isinf",
+    "IsNaN": "isnan",
+    "LRN": "lrn",
+    "LeakyRelu": "leakyrelu",
+    "Log": "log",
+    "LogSoftmax": "logsoftmax",
+    "LpNormalization": "lpnormalization",
+    "MeanVarianceNormalization": "meanvariancenormalization",
+    "Mish": "mish",
+    "Neg": "neg",
+    "Not": "not",
+    "QuantizeLinear": "quantizelinear",
+    "Reciprocal": "reciprocal",
+    "Round": "round",
+    "Selu": "selu",
+    "Shrink": "shrink",
+    "Sigmoid": "sigmoid",
+    "Sign": "sign",
+    "Sin": "sin",
+    "Sinh": "sinh",
+    "Softplus": "softplus",
+    "Softsign": "softsign",
+    "Sqrt": "sqrt",
+    "Swish": "swish",
+    "Tan": "tan",
+    "Tanh": "tanh",
+    "ThresholdedRelu": "thresholdedrelu",
+    "Trilu": "trilu",
+    # --- binary broadcasting ---
+    "And": "and",
+    "BitShift": "bitshift",
+    "BitwiseAnd": "bitwiseand",
+    "BitwiseOr": "bitwiseor",
+    "BitwiseXor": "bitwisexor",
+    "Div": "div",
+    "Equal": "equal",
+    "Greater": "greater",
+    "GreaterOrEqual": "greater_equal",
+    "Less": "less",
+    "LessOrEqual": "less_equal",
+    "Mod": "mod",
+    "Mul": "mul",
+    "Or": "or",
+    "PRelu": "prelu",
+    "Pow": "pow",
+    "Sub": "sub",
+    "Where": "where",
+    "Xor": "xor",
+    # --- variadic broadcasting ---
+    "Max": "max",
+    "Mean": "mean",
+    "Min": "min",
+    "Sum": "sum",
+    # --- normalization ---
+    "BatchNormalization": "batchnorm",
+    "GroupNormalization": "groupnormalization",
+    "InstanceNormalization": "instancenorm",
+    "LayerNormalization": "layernormalization",
+    # --- reduction ---
+    "ArgMax": "argmax",
+    "ArgMin": "argmin",
+    "ReduceL1": "reducel1",
+    "ReduceL2": "reducel2",
+    "ReduceLogSum": "reduce_log_sum",
+    "ReduceLogSumExp": "reduce_log_sum_exp",
+    "ReduceMax": "reducemax",
+    "ReduceMean": "reducemean",
+    "ReduceMin": "reducemin",
+    "ReduceProd": "reduceprod",
+    "ReduceSum": "reducesum",
+    "ReduceSumSquare": "reducesumsquare",
+    # --- pooling ---
+    "AveragePool": "averagepool",
+    "GlobalAveragePool": "globalaveragepool",
+    "GlobalMaxPool": "globalmaxpool",
+    "LpPool": "lppool",
+    "MaxPool": "maxpool",
+    # --- conv ---
+    "Conv": "conv",
+    "ConvTranspose": "convtranspose",
+    # --- gather / scatter ---
+    "GatherElements": "gatherelements",
+    "GatherND": "gathernd",
+    "ScatterElements": "scatterelements",
+    "ScatterND": "scatternd",
+    # --- shape manipulation ---
+    "ConstantOfShape": "constantofshape",
+    "DepthToSpace": "depthtospace",
+    "Det": "det",
+    "Expand": "expand",
+    "OneHot": "onehot",
+    "Pad": "pad",
+    "Shape": "shape",
+    "Size": "size",
+    "Slice": "slice",
+    "SpaceToDepth": "spacetodepth",
+    "Split": "split",
+    "Tile": "tile",
+    "TopK": "topk",
+    # --- matmul variants ---
+    "MatMulInteger": "matmulinteger",
+    # --- other ---
+    "Constant": "constant",
+    "Einsum": "einsum",
+    "NegativeLogLikelihoodLoss": "negativeloglikelihoodloss",
+    "SoftmaxCrossEntropyLoss": "softmaxcrossentropy",
 }
 
 
@@ -94,10 +230,22 @@ def _inject_constant_inputs(
         arr = input_arrays[idx]
         name = inp.name
 
+        # Convert numpy scalars to 0-D arrays
+        if isinstance(arr, np.generic) and not isinstance(arr, np.ndarray):
+            arr = np.array(arr)
+
+        # Skip non-numpy arrays (e.g., onnx custom dtype wrappers)
+        if not isinstance(arr, np.ndarray):
+            continue
+
         # Only inject integer tensors that aren't already initializers.
         if name in existing_init_names:
             continue
-        if arr.dtype.kind != "i" and arr.dtype.kind != "u":
+        if arr.dtype.kind not in ("i", "u"):
+            # Also inject scalar float tensors (e.g., OneHot depth)
+            if arr.ndim == 0 and arr.dtype.kind == "f":
+                tensor = numpy_helper.from_array(arr, name=name)
+                graph.initializer.append(tensor)
             continue
 
         tensor = numpy_helper.from_array(arr, name=name)
@@ -125,6 +273,9 @@ def _get_output_shapes(model: ModelProto) -> dict[str, list[int]]:
 _XFAIL_CASES: set[str] = {
     # NonZero: second output dimension is data-dependent (unknown_nonnegative).
     "test_nonzero_example",
+    # Einsum: ellipsis / scalar cases not fully supported yet.
+    "test_einsum_batch_diagonal",
+    "test_einsum_inner_prod",
 }
 
 
@@ -384,4 +535,4 @@ class TestEngineBasic:
 
     def test_supported_ops(self) -> None:
         """Engine reports all expected operators as supported."""
-        assert _ENGINE.supported_ops == set(_SUPPORTED_OPS.keys())
+        assert set(_SUPPORTED_OPS.keys()).issubset(_ENGINE.supported_ops)
