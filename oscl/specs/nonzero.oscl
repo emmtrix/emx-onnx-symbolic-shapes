@@ -1,3 +1,6 @@
+# NonZero – Returns the indices of all non-zero elements.
+# Output is a 2-D tensor [rank(X), N] where N is the (data-dependent)
+# number of non-zero entries.
 shape {
   inputs X;
   outputs Y;

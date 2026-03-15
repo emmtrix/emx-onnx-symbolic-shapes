@@ -1,3 +1,6 @@
+# Reshape – Reshape the data tensor to the shape given by shape_input.
+# Supports the special values 0 (copy from input) and -1 (infer from
+# total element count) in the target shape.
 shape {
   inputs data, shape_input;
   outputs reshaped;

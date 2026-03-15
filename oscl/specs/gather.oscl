@@ -1,3 +1,7 @@
+# Gather – Gather entries from the data tensor along the given axis
+# using the provided index tensor.
+# The output shape replaces the axis dimension of data with the full
+# shape of indices.
 shape {
   inputs data, indices;
   outputs output;

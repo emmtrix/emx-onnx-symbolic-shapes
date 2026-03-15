@@ -1,3 +1,6 @@
+# MatMul – Matrix multiplication with broadcasting on batch dimensions.
+# The last two dimensions follow standard matrix multiply rules (MxK @ KxN -> MxN).
+# Leading batch dimensions are broadcast using NumPy-style rules.
 shape {
   inputs A, B;
   outputs Y;

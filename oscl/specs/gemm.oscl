@@ -1,3 +1,6 @@
+# Gemm – General Matrix Multiplication: Y = alpha * A' @ B' + beta * C.
+# A' and B' are optionally transposed via the transA / transB attributes.
+# The inner dimensions (k) must match. Output is 2-D [M, N].
 shape {
   inputs A, B, C;
   outputs Y;

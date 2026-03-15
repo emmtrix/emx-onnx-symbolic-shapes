@@ -1,3 +1,5 @@
+# Softmax – Softmax normalization along the given axis.
+# Output shape is identical to the input shape (element-wise operation).
 shape {
   inputs input;
   outputs output;

@@ -1,3 +1,5 @@
+# Squeeze – Remove single-dimensional entries at the specified axes.
+# The axes tensor supplies the positions to remove from the input shape.
 shape {
   inputs data, axes;
   outputs squeezed;

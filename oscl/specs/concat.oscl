@@ -1,3 +1,7 @@
+# Concat – Concatenate a list of tensors along the given axis.
+# All inputs must have the same rank. Dimensions at the concatenation
+# axis are summed; all other dimensions must match and are taken from
+# the first input.
 shape {
   inputs Xs[];
   outputs Y;

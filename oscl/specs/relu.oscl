@@ -1,3 +1,5 @@
+# Relu – Rectified Linear Unit activation.
+# Output shape is identical to the input shape (element-wise operation).
 shape {
   inputs X;
   outputs Y;

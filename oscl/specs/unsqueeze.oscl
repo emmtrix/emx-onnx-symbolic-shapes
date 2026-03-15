@@ -1,3 +1,6 @@
+# Unsqueeze – Insert single-dimensional entries at the specified axes.
+# The axes tensor supplies the positions where new size-1 dimensions
+# are inserted into the output shape.
 shape {
   inputs data, axes;
   outputs expanded;

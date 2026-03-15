@@ -1,3 +1,7 @@
+# Flatten – Flatten a tensor into a 2D matrix.
+# Dimensions before the axis are collapsed into the first output
+# dimension; dimensions from the axis onward form the second.
+# Default axis is 1.
 shape {
   inputs input;
   outputs output;

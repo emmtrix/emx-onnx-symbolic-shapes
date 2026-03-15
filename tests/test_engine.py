@@ -120,13 +120,6 @@ def _get_output_shapes(model: ModelProto) -> dict[str, list[int]]:
 # Test-case collection
 # ---------------------------------------------------------------------------
 
-# Known-limitation test names where the OSCL spec cannot match ONNX due to
-# data-dependent output dimensions not covered by the spec.
-_XFAIL_CASES: set[str] = {
-    # NonZero: second output dimension is data-dependent (unknown_nonnegative).
-    "test_nonzero_example",
-}
-
 
 def _build_test_params() -> list[pytest.param]:
     """Collect parametrized test entries for every supported operator."""
@@ -139,14 +132,7 @@ def _build_test_params() -> list[pytest.param]:
             if not any(n.op_type == op_type for n in tc.model.graph.node):
                 continue
             test_id = tc.name
-            marks: list[Any] = []
-            if test_id in _XFAIL_CASES:
-                marks.append(
-                    pytest.mark.xfail(
-                        reason="Known OSCL spec limitation", strict=True
-                    )
-                )
-            params.append(pytest.param(tc, op_type, id=test_id, marks=marks))
+            params.append(pytest.param(tc, op_type, id=test_id))
     return params
 
 

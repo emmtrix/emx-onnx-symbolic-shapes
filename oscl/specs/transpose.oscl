@@ -1,3 +1,6 @@
+# Transpose – Permute the dimensions of the input tensor.
+# The perm attribute defines the new order of axes.
+# When perm is omitted the dimensions are reversed.
 shape {
   inputs data;
   outputs transposed;

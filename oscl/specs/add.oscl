@@ -1,3 +1,5 @@
+# Add – Element-wise addition.
+# Output shape is the NumPy-style broadcast of both input shapes.
 shape {
   inputs A, B;
   outputs C;
