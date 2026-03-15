@@ -222,7 +222,7 @@ def _builtin_prod(args: list[Any]) -> int | None:
     return result
 
 
-def _builtin_unknown_nonneg(args: list[Any]) -> None:
+def _builtin_unknown_nonnegative(args: list[Any]) -> None:
     """``unknown_nonnegative()`` – unknown data-dependent dimension."""
     return _UNKNOWN
 
@@ -243,7 +243,7 @@ _BUILTINS: dict[str, Any] = {
     "unsqueeze_shape": _builtin_unsqueeze_shape,
     "prod": _builtin_prod,
     "sum": lambda args: sum(args[0]),
-    "unknown_nonnegative": _builtin_unknown_nonneg,
+    "unknown_nonnegative": _builtin_unknown_nonnegative,
     "range": lambda args: range(args[0]),
 }
 
@@ -684,8 +684,15 @@ class OsclShapeInferenceEngine:
                 output_shapes = _execute_spec(
                     spec, input_shapes, attrs, tensor_vals
                 )
-            except Exception:
-                continue  # graceful degradation
+            except (
+                ConstraintViolation,
+                ValueError,
+                TypeError,
+                IndexError,
+                KeyError,
+                NameError,
+            ):
+                continue  # graceful degradation for unsupported edge cases
 
             # Store results back ------------------------------------------------
             for j, out_name in enumerate(spec.outputs):

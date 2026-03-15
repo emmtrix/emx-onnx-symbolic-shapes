@@ -30,8 +30,9 @@ from oscl.engine import OsclShapeInferenceEngine, infer_shapes as oscl_infer_sha
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Suppress numpy overflow warnings from unrelated ONNX test-case modules.
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+# Suppress numpy overflow warnings emitted during ONNX test-case collection
+# (e.g. cast.py, castlike.py).  Scoped to numpy's RuntimeWarnings only.
+warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"numpy\.")
 
 # Singleton engine (avoids re-parsing specs for every test case).
 _ENGINE = OsclShapeInferenceEngine()
@@ -120,9 +121,9 @@ def _get_output_shapes(model: ModelProto) -> dict[str, list[int]]:
 # ---------------------------------------------------------------------------
 
 # Known-limitation test names where the OSCL spec cannot match ONNX due to
-# data-dependent output shapes or 1-D edge cases not covered by the spec.
+# data-dependent output dimensions not covered by the spec.
 _XFAIL_CASES: set[str] = {
-    # NonZero: second dimension is data-dependent (unknown_nonnegative).
+    # NonZero: second output dimension is data-dependent (unknown_nonnegative).
     "test_nonzero_example",
 }
 
