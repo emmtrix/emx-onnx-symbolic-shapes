@@ -88,7 +88,7 @@ OTSL does not attempt to:
 | Dim         | single tensor dimension                      |
 | Shape       | ordered list of dimensions                   |
 | Type        | tensor element type                          |
-| ShapeTensor | tensor whose runtime values represent shapes |
+| ShapeTensor | tensor whose statically available integer contents encode shape-related values |
 
 ---
 
@@ -106,12 +106,13 @@ rank(A)
 
 ### Dim
 
-A dimension may be:
+A dimension term may be:
 
 - constant integer
 - symbolic variable
 - expression over dimensions
 - unknown
+- unknown non-negative
 
 Examples:
 
@@ -120,7 +121,20 @@ Examples:
 sym("N")
 dim(A,0) + 5
 ?
+unknown_nonnegative()
 ```
+
+OTSL uses the following dimension state model.
+
+| State                | Notation                  | Meaning |
+|---------------------|---------------------------|---------|
+| known constant      | `32`                      | exact non-negative integer dimension |
+| symbolic variable   | `sym("N")`                | named unknown dimension participating in equality reasoning |
+| expression          | `dim(A,0) + 5`            | symbolic term over dimension values |
+| unknown             | `?`                       | fresh unconstrained dimension term with no reusable identity |
+| unknown non-negative| `unknown_nonnegative()`   | fresh unknown term additionally constrained to be `>= 0` |
+
+Dimensions appearing in tensor shapes denote non-negative runtime sizes. `unknown_nonnegative()` is used when the specification knows only that a data-dependent result is non-negative. Plain `?` indicates no useful arithmetic information beyond the fact that the value is a dimension term.
 
 ### Shape
 
@@ -176,6 +190,8 @@ Example:
 ```
 shape_value(shape)
 ```
+
+`shape_value()` reads from the abstract shape-tensor domain defined in section 10. Its result is not arbitrary tensor data and may include operator-defined sentinel integers such as those used by `Reshape`.
 
 ---
 
@@ -255,7 +271,23 @@ when rank(A) == 1 and rank(B) == 1 {
 }
 ```
 
-Multiple branches may exist.
+Multiple branches may exist. Conditions are evaluated in source order using the current environment produced by preceding active statements in the enclosing scope.
+
+A `when` condition has three-valued semantics: `true`, `false`, or `unknown`. Only `true` activates the branch. `false` and `unknown` do not activate it.
+
+Every active branch is evaluated; `when` is not first-match. Active branches contribute additional `let` bindings (branch-local), constraints, and result assignments. If multiple active branches assign the same output field, the normalized assigned expressions must be identical; otherwise the rule result is `invalid`.
+
+---
+
+### `shape_tensors`
+
+Declares which inputs may be inspected by `shape_value()`.
+
+```
+shape_tensors shape;
+```
+
+`shape_tensors` names a subset of `inputs`. The declaration is part of the operator schema and is therefore statically known.
 
 ---
 
@@ -273,7 +305,20 @@ max(d1,d2)
 min(d1,d2)
 ```
 
-These expressions operate on `Dim` values.
+Conditional and bounded structural expressions used by the examples are also part of the DSL:
+
+```
+if c then e1 else e2
+range(n)
+map x in S: e
+sum(map x in S: e)
+```
+
+These expressions operate on `Dim`, `Shape`, or finite structural sequences. `map`, `range`, and `sum` are declarative structural operators, not general iteration constructs.
+
+Their domains must be finite and statically delimited by the schema or by already-computed ranks or sequence lengths. They introduce no mutation, recursion, or user-defined control flow. If an implementation cannot establish the iteration domain during inference, the enclosing expression evaluates conservatively to `unknown` rather than triggering arbitrary computation.
+
+Dimension expressions are first-order terms. Implementations may normalize them only by substitution of solved equalities and deterministic simplifications such as constant folding and elimination of identity operations. General algebraic rearrangement is not required.
 
 ---
 
@@ -332,6 +377,16 @@ Computes broadcasted shape.
 
 ---
 
+### `normalize_axis`
+
+```
+normalize_axis(axis, rank)
+```
+
+Normalizes a possibly negative axis into the interval `[0, rank-1]`.
+
+---
+
 ### `permute`
 
 ```
@@ -342,6 +397,18 @@ Applies dimension permutation.
 
 ---
 
+### `resolve_reshape`
+
+```
+resolve_reshape(input_shape, target_shape)
+```
+
+Computes the output shape produced by the ONNX `Reshape` operator from an input shape and a shape-tensor value.
+
+`broadcast`, `normalize_axis`, and `resolve_reshape` are normative built-ins. Their semantics follow the corresponding ONNX operator definitions and helper behavior for the applicable opset. Implementations may reuse existing ONNX helper code, but they must not substitute implementation-defined behavior.
+
+---
+
 ## 10 Shape Tensor Evaluation
 
 Some operators accept tensors describing shapes.
@@ -349,12 +416,19 @@ Some operators accept tensors describing shapes.
 Example:
 
 ```
+shape_tensors shape;
 let target = shape_value(shape);
 ```
 
-`shape_value()` extracts symbolic shape information.
+`shape_value()` extracts values from the abstract shape-tensor domain, not from arbitrary runtime tensor computation.
 
-Shape tensor evaluation is restricted to inputs explicitly defined as shape tensors in the operator specification.
+A shape tensor input is declared with `shape_tensors` and must be an integer-typed input designated by the operator schema as carrying shape information.
+
+`shape_value(x)` is valid only when `x` is a direct input reference declared in `shape_tensors`. It is not valid on arbitrary expressions, intermediate tensors, or outputs of general computation.
+
+The value returned by `shape_value(x)` is a finite abstract integer sequence whose entries may be known integers or unknown entries. The sequence may contain operator-defined sentinel integers when permitted by ONNX semantics; for example, the `shape` input of `Reshape` may contain `0` or `-1`.
+
+OTSL does not evaluate arbitrary tensor values. An implementation may populate the abstract shape-tensor value only from sources already available to ONNX inference, such as constant initializers, constant-folded shape carriers, or other schema-defined shape tensors. If the contents are unavailable, `shape_value(x)` yields a sequence of unknown entries of the appropriate abstract length.
 
 ---
 
@@ -364,12 +438,13 @@ OTSL supports incomplete knowledge for both types and shapes.
 
 Possible dimension states:
 
-| State          | Example    |
-|----------------|------------|
-| known constant | `32`       |
-| symbolic       | `sym("N")` |
-| expression     | `N + 5`    |
-| unknown        | `?`        |
+| State                | Example                   |
+|---------------------|---------------------------|
+| known constant      | `32`                      |
+| symbolic variable   | `sym("N")`                |
+| expression          | `sym("N") + 5`            |
+| unknown             | `?`                       |
+| unknown non-negative| `unknown_nonnegative()`   |
 
 Constraints may propagate relationships even if values are unknown.
 
@@ -383,7 +458,30 @@ Type inference may likewise remain unresolved when the rule block does not deter
 
 ---
 
-## 12 Built-in Constraint Predicates
+## 12 Constraint Solving and Built-in Constraint Predicates
+
+OTSL constraint solving is defined over normalized dimension terms. Let `normalize(t)` recursively substitute all solved equalities into `t` and apply deterministic local simplifications such as constant folding.
+
+Equality constraints on dimensions are processed using the following rules:
+
+1. `constant == constant` succeeds iff the constants are identical; otherwise the rule result is `invalid`.
+2. `symbolic == symbolic`, `symbolic == unknown`, and `unknown == unknown` merge the participating representatives into one equivalence class. The canonical representative is the earliest syntactic occurrence in rule-block source order.
+3. `representative == expression` binds the representative to the normalized expression iff the representative does not occur inside that expression. This substitution is then propagated to all later evaluations and result expressions.
+4. `expression == expression` succeeds immediately when the normalized expressions are syntactically identical. If both normalize to different constants, the rule result is `invalid`. Otherwise the equality remains unresolved; implementations are not required to perform general symbolic algebra such as cancellation or rearrangement.
+
+Each evaluation of `?` or `unknown_nonnegative()` produces a fresh dimension term. If such a term is unified with a constant, symbolic variable, or expression, that information propagates to every occurrence of that same term created through the current input binding, `let` binding, or equality propagation.
+
+`unknown_nonnegative()` additionally contributes the constraint `d >= 0`. Any solved equality that forces such a term to a negative constant is a contradiction and therefore `invalid`.
+
+Cyclic bindings are contradictions. For example, `require dim(A,0) == dim(A,0) + 1;` is `invalid`.
+
+Constraint propagation is monotonic and deterministic. Implementations may refine terms by substitution, equivalence-class merging, and deterministic local simplification only. They must not rely on implementation-defined search, backtracking, or non-deterministic algebraic rewrites.
+
+A `require` predicate evaluates in three-valued logic after normalization:
+
+- `true`: the predicate is satisfied
+- `false`: the active rule result is `invalid`
+- `unknown`: the predicate remains unresolved and the overall inference result cannot be more precise than `partial`
 
 ```
 compatible(d1,d2)
@@ -391,7 +489,7 @@ same_shape(A,B)
 known(d)
 ```
 
-These predicates allow safe reasoning when dimensions are partially known. Type comparisons use standard equality and set-membership expressions.
+`known(d)` is `true` iff `d` normalizes to a constant. `compatible(d1,d2)` is `false` only when the normalized terms are provably unequal, `true` when they are provably equal, and `unknown` otherwise. `same_shape(A,B)` is defined pointwise from rank equality and `compatible` on corresponding dimensions. Type comparisons use standard equality and set-membership expressions and are solved exactly; no subtype relation is introduced.
 
 ---
 
@@ -465,6 +563,7 @@ The result type follows the variadic input family. Any additional homogeneous-ty
 ```
 rules {
   inputs data, shape;
+  shape_tensors shape;
   outputs reshaped;
 
   let target = shape_value(shape);
@@ -511,7 +610,7 @@ Example (simplified JSON):
 }
 ```
 
-The textual syntax is considered a presentation format.
+The textual syntax is considered a presentation format. The AST must also encode declarations such as variadic inputs, attributes, and `shape_tensors`.
 
 ### C++ Shape and Type Rule Representation
 
@@ -546,7 +645,30 @@ The OTSL textual syntax maps directly to this AST and remains the human-readable
 
 ---
 
-## 16 Error Semantics
+## 16 Formal Evaluation Model
+
+Evaluation of a rule block is deterministic and proceeds as follows:
+
+1. Bind the schema-declared inputs, outputs, attributes, variadic families, and `shape_tensors`.
+2. Initialize the environment with the available input ranks, shapes, element types, and shape-tensor abstract values. Missing information is represented by fresh unknown terms from section 5.
+3. Evaluate top-level statements in source order.
+4. For each active `let`, evaluate the right-hand side in the current environment, normalize it with the current solved equalities, and bind the name in the current lexical scope.
+5. For each active `require`, normalize the predicate, add its constraints, and run the section 12 solver to a fixed point over the current accumulated constraints.
+6. For each `when`, evaluate the condition in the current environment. If it is `true`, evaluate the nested statements in a child scope using the same algorithm; if it is `false` or `unknown`, skip the branch.
+7. Accumulate all active `result` assignments. Multiple assignments to the same output field are permitted only if they normalize to the same expression; otherwise the rule result is `invalid`.
+8. After all active statements have been processed, normalize every output shape and output type with the final solved equalities.
+9. Classify the result:
+   - `invalid` if any contradiction was derived
+   - `exact` if every output type and dimension is fully known
+   - `symbolic` if outputs are determined but contain symbolic variables or expressions and no unknowns
+   - `partial` if some outputs are derived but contain unknowns or unresolved predicates
+   - `unknown` if no output property can be derived
+
+This algorithm defines the observable semantics. Implementations may optimize it, but any equivalent implementation must produce the same normalized constraints, output assignments, and status for the same inputs.
+
+---
+
+## 17 Error Semantics
 
 Evaluation of type and shape rules may produce:
 
@@ -560,11 +682,17 @@ Evaluation of type and shape rules may produce:
 
 ---
 
-## 17 Integration with ONNX
+## 18 Integration with ONNX
 
 Each `OpSchema` may optionally include a type and shape rule specification.
 
-The canonical representation is a C++ AST attached to the schema. The OTSL textual syntax maps directly to this AST and may be used for authoring, review, interchange, or generated documentation. Runtimes may ignore these rules if unsupported.
+The canonical representation is a C++ AST attached to a specific operator schema version. The OTSL textual syntax maps directly to this AST and may be used for authoring, review, interchange, or generated documentation.
+
+OTSL rules are versioned with the ONNX operator schema/opset version to which they are attached. A change in normative rule semantics requires the corresponding schema versioning discipline already used by ONNX.
+
+If both an OTSL rule set and an imperative `TypeAndShapeInferenceFunction` are present for the same schema version, they are required to be semantically equivalent. OTSL is the normative portable specification; the imperative function is an allowed implementation strategy and backward-compatibility mechanism.
+
+A runtime that does not support OTSL may ignore the attached rules and instead use an existing imperative inference function or perform no inference. Lack of OTSL support must not change model validity; it only affects the amount of inference available.
 
 Example:
 
@@ -578,7 +706,7 @@ Existing imperative inference functions may remain for backward compatibility.
 
 ---
 
-## 18 Reference Implementation Goals
+## 19 Reference Implementation Goals
 
 A prototype implementation should:
 
@@ -596,7 +724,7 @@ Suggested implementation languages:
 
 ---
 
-## 19 Backward Compatibility
+## 20 Backward Compatibility
 
 This proposal does not modify ONNX graph semantics.
 
@@ -610,18 +738,18 @@ Runtimes may:
 
 ---
 
-## 20 Future Work
+## 21 Future Work
 
 Possible extensions include:
 
 - interval dimension reasoning
-- constraint solving
+- richer constraint solving beyond equality and local normalization
 - automated operator verification
 - integration with graph optimization passes
 
 ---
 
-## 21 Conclusion
+## 22 Conclusion
 
 OTSL introduces a declarative, machine-readable way to describe ONNX operator type and shape semantics.
 
