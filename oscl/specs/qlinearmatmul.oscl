@@ -1,4 +1,4 @@
-shape {
+rules {
   inputs a, a_scale, a_zero, b, b_scale, b_zero, y_scale, y_zero;
   outputs y;
 
@@ -6,5 +6,5 @@ shape {
 
   let batch = broadcast(prefix(a,-2), prefix(b,-2));
 
-  result y = concat(batch, [dim(a,-2), dim(b,-1)]);
+  result y.shape = concat(batch, [dim(a,-2), dim(b,-1)]);
 }

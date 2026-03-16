@@ -1,7 +1,7 @@
-shape {
+rules {
   inputs X, W;
   outputs Y;
   attributes kernel_shape, strides, pads, dilations, group, auto_pad, output_padding, output_shape;
 
-  result Y = convtranspose_shape(shape(X), shape(W), kernel_shape, strides, pads, dilations, group, auto_pad, output_padding, output_shape);
+  result Y.shape = convtranspose_shape(shape(X), shape(W), kernel_shape, strides, pads, dilations, group, auto_pad, output_padding, output_shape);
 }

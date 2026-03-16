@@ -23,7 +23,6 @@ from .ast import (
     IfExpr,
     IndexExpr,
     LetStmt,
-    MapExpr,
     NumberLit,
     RequireStmt,
     ResultStmt,
@@ -31,7 +30,6 @@ from .ast import (
     ShapeSpec,
     StringLit,
     UnknownDim,
-    WhenStmt,
 )
 from .loader import load_all_specs
 
@@ -119,6 +117,32 @@ def _builtin_concat(args: list[Any]) -> list[int | None]:
     """``concat(s1, s2)`` â€“ concatenate two shapes."""
     s1, s2 = args
     return _to_shape(s1) + _to_shape(s2)
+
+
+
+def _builtin_concat_shape(args: list[Any]) -> list[int | None]:
+    """Compute ONNX Concat output shape from a variadic input family and axis."""
+    inputs, axis = args
+    if not inputs:
+        raise ValueError("concat_shape: empty input family")
+    first = _to_shape(inputs[0])
+    r = len(first)
+    if axis < 0:
+        axis += r
+    result: list[int | None] = []
+    for j in range(r):
+        if j == axis:
+            total: int | None = 0
+            for inp in inputs:
+                d = _to_shape(inp)[j]
+                if d is None or total is None:
+                    total = None
+                else:
+                    total += d
+            result.append(total)
+        else:
+            result.append(first[j])
+    return result
 
 
 def _builtin_permute(args: list[Any]) -> list[int | None]:
@@ -797,6 +821,7 @@ _BUILTINS: dict[str, Any] = {
     "suffix": _builtin_suffix,
     "broadcast": _builtin_broadcast,
     "concat": _builtin_concat,
+    "concat_shape": _builtin_concat_shape,
     "permute": _builtin_permute,
     "normalize_axis": _builtin_normalize_axis,
     "shape_value": lambda args: list(args[0]),  # identity; value already resolved
@@ -804,9 +829,7 @@ _BUILTINS: dict[str, Any] = {
     "squeeze_shape": _builtin_squeeze_shape,
     "unsqueeze_shape": _builtin_unsqueeze_shape,
     "prod": _builtin_prod,
-    "sum": lambda args: sum(args[0]),
     "unknown_nonnegative": _builtin_unknown_nonnegative,
-    "range": lambda args: range(args[0]),
     # --- new built-ins ---
     "reduce_shape": _builtin_reduce_shape,
     "tile_shape": _builtin_tile_shape,
@@ -902,9 +925,6 @@ def _eval_expr(expr: Expr, env: _EvalEnv) -> Any:
             return _eval_expr(expr.then_expr, env)
         return _eval_expr(expr.else_expr, env)
 
-    if isinstance(expr, MapExpr):
-        return _eval_map(expr, env)
-
     raise TypeError(f"Unknown expression type: {type(expr).__name__}")
 
 
@@ -960,28 +980,6 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     raise NameError(f"Unknown function: {name!r}")
 
 
-def _eval_map(expr: MapExpr, env: _EvalEnv) -> list[Any]:
-    """Evaluate a map comprehension."""
-    iterable = _eval_expr(expr.iter_expr, env)
-
-    # range() returns a range object or int
-    if isinstance(iterable, int):
-        iterable = range(iterable)
-
-    results = []
-    for item in iterable:
-        # Temporarily bind the loop variable
-        old = env.variables.get(expr.var)
-        env.variables[expr.var] = item
-        results.append(_eval_expr(expr.body, env))
-        # Restore
-        if old is not None:
-            env.variables[expr.var] = old
-        else:
-            env.variables.pop(expr.var, None)
-
-    return results
-
 
 # ---------------------------------------------------------------------------
 # Spec execution
@@ -1030,23 +1028,10 @@ def _execute_spec(
                 raise ConstraintViolation(f"Constraint violated: {stmt.expr}")
 
         elif isinstance(stmt, ResultStmt):
-            val = _eval_expr(stmt.expr, env)
-            results[stmt.name] = _to_shape(val)
-
-        elif isinstance(stmt, WhenStmt):
-            cond = _eval_expr(stmt.condition, env)
-            if cond:
-                for inner in stmt.body:
-                    if isinstance(inner, LetStmt):
-                        env.variables[inner.name] = _eval_expr(inner.expr, env)
-                    elif isinstance(inner, ResultStmt):
-                        val = _eval_expr(inner.expr, env)
-                        results[inner.name] = _to_shape(val)
-                    elif isinstance(inner, RequireStmt):
-                        if not _eval_expr(inner.expr, env):
-                            raise ConstraintViolation(
-                                f"Constraint violated: {inner.expr}"
-                            )
+            if stmt.field == "shape":
+                val = _eval_expr(stmt.expr, env)
+                results[stmt.target] = _to_shape(val)
+            # .type results are currently handled by the engine separately
 
     return results
 

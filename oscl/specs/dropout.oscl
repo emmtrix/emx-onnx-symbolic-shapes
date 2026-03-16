@@ -1,7 +1,7 @@
-shape {
+rules {
   inputs data;
   outputs output, mask;
 
-  result output = shape(data);
-  result mask = shape(data);
+  result output.shape = shape(data);
+  result mask.shape = shape(data);
 }

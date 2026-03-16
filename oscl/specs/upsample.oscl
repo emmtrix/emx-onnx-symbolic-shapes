@@ -1,8 +1,8 @@
-shape {
+rules {
   inputs X, scales;
   outputs Y;
 
   let sc = shape_value(scales);
 
-  result Y = resize_shape(shape(X), sc, []);
+  result Y.shape = resize_shape(shape(X), sc, []);
 }

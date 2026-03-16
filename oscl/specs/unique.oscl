@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs X;
   outputs Y;
 
-  result Y = [unknown_nonnegative()];
+  result Y.shape = [unknown_nonnegative()];
 }

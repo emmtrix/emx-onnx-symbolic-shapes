@@ -12,7 +12,6 @@ from oscl.ast import (
     IndexExpr,
     InputDecl,
     LetStmt,
-    MapExpr,
     NumberLit,
     RequireStmt,
     ResultStmt,
@@ -20,7 +19,6 @@ from oscl.ast import (
     ShapeSpec,
     StringLit,
     UnknownDim,
-    WhenStmt,
 )
 from oscl.parser import ParseError, parse
 
@@ -30,21 +28,21 @@ from oscl.parser import ParseError, parse
 # ---------------------------------------------------------------
 
 class TestBasicParsing:
-    def test_empty_shape(self) -> None:
-        spec = parse("shape { }")
+    def test_empty_rules(self) -> None:
+        spec = parse("rules { }")
         assert spec == ShapeSpec()
 
     def test_inputs_outputs(self) -> None:
-        spec = parse("shape { inputs A, B; outputs Y; }")
+        spec = parse("rules { inputs A, B; outputs Y; }")
         assert spec.inputs == [InputDecl("A"), InputDecl("B")]
         assert spec.outputs == ["Y"]
 
     def test_variadic_input(self) -> None:
-        spec = parse("shape { inputs Xs[]; outputs Y; }")
+        spec = parse("rules { inputs Xs[]; outputs Y; }")
         assert spec.inputs == [InputDecl("Xs", variadic=True)]
 
     def test_attributes(self) -> None:
-        spec = parse("shape { attributes axis, perm; }")
+        spec = parse("rules { attributes axis, perm; }")
         assert spec.attributes == ["axis", "perm"]
 
 
@@ -54,38 +52,25 @@ class TestBasicParsing:
 
 class TestStatements:
     def test_require(self) -> None:
-        spec = parse("shape { require dim(A,-1) == dim(B,-2); }")
+        spec = parse("rules { require dim(A,-1) == dim(B,-2); }")
         stmt = spec.statements[0]
         assert isinstance(stmt, RequireStmt)
         assert isinstance(stmt.expr, BinOp)
         assert stmt.expr.op == "=="
 
     def test_let(self) -> None:
-        spec = parse("shape { let x = dim(A,0); }")
+        spec = parse("rules { let x = dim(A,0); }")
         stmt = spec.statements[0]
         assert isinstance(stmt, LetStmt)
         assert stmt.name == "x"
         assert isinstance(stmt.expr, FuncCall)
 
     def test_result(self) -> None:
-        spec = parse("shape { outputs Y; result Y = shape(X); }")
+        spec = parse("rules { outputs Y; result Y.shape = shape(X); }")
         stmt = spec.statements[0]
         assert isinstance(stmt, ResultStmt)
-        assert stmt.name == "Y"
-
-    def test_when(self) -> None:
-        src = """
-        shape {
-            when rank(A) == 1 {
-                result Y = shape(A);
-            }
-        }
-        """
-        spec = parse(src)
-        stmt = spec.statements[0]
-        assert isinstance(stmt, WhenStmt)
-        assert isinstance(stmt.condition, BinOp)
-        assert len(stmt.body) == 1
+        assert stmt.target == "Y"
+        assert stmt.field == "shape"
 
 
 # ---------------------------------------------------------------
@@ -94,65 +79,59 @@ class TestStatements:
 
 class TestExpressions:
     def test_number(self) -> None:
-        spec = parse("shape { let x = 42; }")
+        spec = parse("rules { let x = 42; }")
         assert isinstance(spec.statements[0].expr, NumberLit)
         assert spec.statements[0].expr.value == 42
 
     def test_negative_number(self) -> None:
-        spec = parse("shape { let x = dim(A,-1); }")
+        spec = parse("rules { let x = dim(A,-1); }")
         call = spec.statements[0].expr
         assert isinstance(call, FuncCall)
         assert isinstance(call.args[1], NumberLit)
         assert call.args[1].value == -1
 
     def test_unknown_dim(self) -> None:
-        spec = parse("shape { let x = ?; }")
+        spec = parse("rules { let x = ?; }")
         assert isinstance(spec.statements[0].expr, UnknownDim)
 
     def test_string_literal(self) -> None:
-        spec = parse('shape { let x = "N"; }')
+        spec = parse('rules { let x = "N"; }')
         assert isinstance(spec.statements[0].expr, StringLit)
         assert spec.statements[0].expr.value == "N"
 
     def test_func_call(self) -> None:
-        spec = parse("shape { let x = broadcast(shape(A), shape(B)); }")
+        spec = parse("rules { let x = broadcast(shape(A), shape(B)); }")
         call = spec.statements[0].expr
         assert isinstance(call, FuncCall)
         assert call.name == "broadcast"
         assert len(call.args) == 2
 
     def test_shape_literal(self) -> None:
-        spec = parse("shape { let x = [dim(A,0), dim(B,1)]; }")
+        spec = parse("rules { let x = [dim(A,0), dim(B,1)]; }")
         lit = spec.statements[0].expr
         assert isinstance(lit, ShapeLiteral)
         assert len(lit.dims) == 2
 
     def test_index_expr(self) -> None:
-        spec = parse("shape { let x = Xs[0]; }")
+        spec = parse("rules { let x = Xs[0]; }")
         idx = spec.statements[0].expr
         assert isinstance(idx, IndexExpr)
         assert isinstance(idx.obj, Identifier)
         assert idx.obj.name == "Xs"
 
     def test_if_expr(self) -> None:
-        spec = parse("shape { let x = if transA then dim(A,-1) else dim(A,-2); }")
+        spec = parse("rules { let x = if transA then dim(A,-1) else dim(A,-2); }")
         expr = spec.statements[0].expr
         assert isinstance(expr, IfExpr)
 
-    def test_map_expr(self) -> None:
-        spec = parse("shape { let x = map i in Xs: dim(i,0); }")
-        expr = spec.statements[0].expr
-        assert isinstance(expr, MapExpr)
-        assert expr.var == "i"
-
     def test_binary_ops(self) -> None:
-        spec = parse("shape { require a + b == c * d; }")
+        spec = parse("rules { require a + b == c * d; }")
         expr = spec.statements[0].expr
         assert isinstance(expr, BinOp)
         assert expr.op == "=="
 
     def test_logical_ops(self) -> None:
-        spec = parse("shape { require a == 1 and b == 2 or c == 3; }")
+        spec = parse("rules { require a == 1 and b == 2 or c == 3; }")
         expr = spec.statements[0].expr
         # or has lowest precedence: (a==1 and b==2) or (c==3)
         assert isinstance(expr, BinOp)
@@ -161,7 +140,7 @@ class TestExpressions:
         assert expr.left.op == "and"
 
     def test_parenthesised_expr(self) -> None:
-        spec = parse("shape { let x = (a + b) * c; }")
+        spec = parse("rules { let x = (a + b) * c; }")
         expr = spec.statements[0].expr
         assert isinstance(expr, BinOp)
         assert expr.op == "*"
@@ -169,7 +148,7 @@ class TestExpressions:
         assert expr.left.op == "+"
 
     def test_arithmetic_addition(self) -> None:
-        spec = parse("shape { let x = ax + 1; }")
+        spec = parse("rules { let x = ax + 1; }")
         expr = spec.statements[0].expr
         assert isinstance(expr, BinOp)
         assert expr.op == "+"
@@ -182,12 +161,12 @@ class TestExpressions:
 class TestRFCExamples:
     def test_matmul(self) -> None:
         src = """
-        shape {
+        rules {
           inputs A, B;
           outputs Y;
           require dim(A,-1) == dim(B,-2);
           let batch = broadcast(prefix(A,-2), prefix(B,-2));
-          result Y = concat(batch, [dim(A,-2), dim(B,-1)]);
+          result Y.shape = concat(batch, [dim(A,-2), dim(B,-1)]);
         }
         """
         spec = parse(src)
@@ -197,31 +176,27 @@ class TestRFCExamples:
 
     def test_concat(self) -> None:
         src = """
-        shape {
+        rules {
           inputs Xs[];
           outputs Y;
           attributes axis;
-          let ax = normalize_axis(axis, rank(Xs[0]));
-          result Y =
-            map j in range(rank(Xs[0])):
-              if j == ax
-                then sum(map i in Xs: dim(i,j))
-                else dim(Xs[0],j);
+          result Y.shape = concat_shape(Xs, axis);
         }
         """
         spec = parse(src)
         assert spec.inputs[0].variadic is True
-        result_stmt = spec.statements[1]
+        result_stmt = spec.statements[0]
         assert isinstance(result_stmt, ResultStmt)
-        assert isinstance(result_stmt.expr, MapExpr)
+        assert isinstance(result_stmt.expr, FuncCall)
+        assert result_stmt.expr.name == "concat_shape"
 
     def test_reshape(self) -> None:
         src = """
-        shape {
+        rules {
           inputs data, shape_input;
           outputs reshaped;
           let target = shape_value(shape_input);
-          result reshaped = resolve_reshape(shape(data), target);
+          result reshaped.shape = resolve_reshape(shape(data), target);
         }
         """
         spec = parse(src)
@@ -230,10 +205,10 @@ class TestRFCExamples:
 
     def test_nonzero(self) -> None:
         src = """
-        shape {
+        rules {
           inputs X;
           outputs Y;
-          result Y = [rank(X), unknown_nonnegative()];
+          result Y.shape = [rank(X), unknown_nonnegative()];
         }
         """
         spec = parse(src)
@@ -243,7 +218,7 @@ class TestRFCExamples:
 
     def test_gemm(self) -> None:
         src = """
-        shape {
+        rules {
           inputs A, B, C;
           outputs Y;
           attributes transA, transB;
@@ -252,7 +227,7 @@ class TestRFCExamples:
           let k2 = if transB then dim(B,-1) else dim(B,-2);
           let n = if transB then dim(B,-2) else dim(B,-1);
           require k1 == k2;
-          result Y = [m, n];
+          result Y.shape = [m, n];
         }
         """
         spec = parse(src)
@@ -285,19 +260,19 @@ def test_all_spec_files_parse(spec_file: Path) -> None:
 class TestParseErrors:
     def test_missing_lbrace(self) -> None:
         with pytest.raises(ParseError):
-            parse("shape }")
+            parse("rules }")
 
     def test_missing_semicolon(self) -> None:
         with pytest.raises(ParseError):
-            parse("shape { let x = 1 }")
+            parse("rules { let x = 1 }")
 
     def test_unexpected_token(self) -> None:
         with pytest.raises(ParseError):
-            parse("shape { 42; }")
+            parse("rules { 42; }")
 
     def test_error_has_position(self) -> None:
         with pytest.raises(ParseError) as exc_info:
-            parse("shape { let x = ; }")
+            parse("rules { let x = ; }")
         assert exc_info.value.line >= 1
         assert exc_info.value.col >= 1
 
@@ -310,7 +285,7 @@ class TestComments:
     def test_hash_comment(self) -> None:
         src = """
         # This is a comment
-        shape {
+        rules {
           inputs A; # inline comment
           outputs Y;
         }
@@ -321,7 +296,7 @@ class TestComments:
     def test_slash_comment(self) -> None:
         src = """
         // This is a comment
-        shape {
+        rules {
           inputs A; // inline comment
           outputs Y;
         }

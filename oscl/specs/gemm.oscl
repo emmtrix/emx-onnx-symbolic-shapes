@@ -1,4 +1,4 @@
-shape {
+rules {
   inputs A, B, C;
   outputs Y;
   attributes transA, transB;
@@ -10,5 +10,5 @@ shape {
 
   require k1 == k2;
 
-  result Y = [m, n];
+  result Y.shape = [m, n];
 }

@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs condition, X, Y;
   outputs output;
 
-  result output = broadcast(broadcast(shape(condition), shape(X)), shape(Y));
+  result output.shape = broadcast(broadcast(shape(condition), shape(X)), shape(Y));
 }

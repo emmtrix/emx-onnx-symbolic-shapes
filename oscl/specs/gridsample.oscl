@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs X, grid;
   outputs Y;
 
-  result Y = gridsample_shape(shape(X), shape(grid));
+  result Y.shape = gridsample_shape(shape(X), shape(grid));
 }

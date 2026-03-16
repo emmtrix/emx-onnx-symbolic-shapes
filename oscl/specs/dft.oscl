@@ -1,7 +1,7 @@
-shape {
+rules {
   inputs input;
   outputs output;
   attributes axis, inverse, onesided;
 
-  result output = dft_shape(shape(input), axis, onesided);
+  result output.shape = dft_shape(shape(input), axis, onesided);
 }

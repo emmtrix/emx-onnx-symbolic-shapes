@@ -1,8 +1,8 @@
-shape {
+rules {
   inputs data, axes;
   outputs squeezed;
 
   let target_axes = shape_value(axes);
 
-  result squeezed = squeeze_shape(shape(data), target_axes);
+  result squeezed.shape = squeeze_shape(shape(data), target_axes);
 }

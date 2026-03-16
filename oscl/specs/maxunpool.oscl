@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs X, I, output_shape_input;
   outputs output;
 
-  result output = shape_value(output_shape_input);
+  result output.shape = shape_value(output_shape_input);
 }

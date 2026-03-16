@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs data, indices;
   outputs output;
 
-  result output = shape(indices);
+  result output.shape = shape(indices);
 }

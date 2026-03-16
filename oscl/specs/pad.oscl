@@ -1,9 +1,9 @@
-shape {
+rules {
   inputs data, pads, constant_value, axes;
   outputs output;
 
   let pad_vals = shape_value(pads);
   let axes_vals = shape_value(axes);
 
-  result output = pad_shape(shape(data), pad_vals, axes_vals);
+  result output.shape = pad_shape(shape(data), pad_vals, axes_vals);
 }

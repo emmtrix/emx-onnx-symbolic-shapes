@@ -5,19 +5,19 @@ import pytest
 
 
 class TestBasicTokenization:
-    def test_empty_shape(self) -> None:
-        tokens = tokenize("shape { }")
+    def test_empty_rules(self) -> None:
+        tokens = tokenize("rules { }")
         types = [t.type for t in tokens]
-        assert types == [TokenType.SHAPE, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
+        assert types == [TokenType.RULES, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
 
     def test_keywords(self) -> None:
-        src = "shape inputs outputs attributes require let result when if then else map in and or"
+        src = "rules inputs outputs attributes require let result if then else and or"
         tokens = tokenize(src)
         expected = [
-            TokenType.SHAPE, TokenType.INPUTS, TokenType.OUTPUTS,
+            TokenType.RULES, TokenType.INPUTS, TokenType.OUTPUTS,
             TokenType.ATTRIBUTES, TokenType.REQUIRE, TokenType.LET,
-            TokenType.RESULT, TokenType.WHEN, TokenType.IF, TokenType.THEN,
-            TokenType.ELSE, TokenType.MAP, TokenType.IN, TokenType.AND,
+            TokenType.RESULT, TokenType.IF, TokenType.THEN,
+            TokenType.ELSE, TokenType.AND,
             TokenType.OR, TokenType.EOF,
         ]
         assert [t.type for t in tokens] == expected
@@ -38,12 +38,13 @@ class TestBasicTokenization:
         ]
 
     def test_delimiters(self) -> None:
-        tokens = tokenize("{ } ( ) [ ] ; , :")
+        tokens = tokenize("{ } ( ) [ ] ; , : .")
         types = [t.type for t in tokens[:-1]]
         assert types == [
             TokenType.LBRACE, TokenType.RBRACE, TokenType.LPAREN,
             TokenType.RPAREN, TokenType.LBRACKET, TokenType.RBRACKET,
             TokenType.SEMICOLON, TokenType.COMMA, TokenType.COLON,
+            TokenType.DOT,
         ]
 
     def test_string_literal(self) -> None:
@@ -82,19 +83,19 @@ class TestNegativeNumbers:
 
 class TestComments:
     def test_hash_comment(self) -> None:
-        tokens = tokenize("shape # this is a comment\n{ }")
+        tokens = tokenize("rules # this is a comment\n{ }")
         types = [t.type for t in tokens]
-        assert types == [TokenType.SHAPE, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
+        assert types == [TokenType.RULES, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
 
     def test_slash_comment(self) -> None:
-        tokens = tokenize("shape // comment\n{ }")
+        tokens = tokenize("rules // comment\n{ }")
         types = [t.type for t in tokens]
-        assert types == [TokenType.SHAPE, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
+        assert types == [TokenType.RULES, TokenType.LBRACE, TokenType.RBRACE, TokenType.EOF]
 
 
 class TestLineColumn:
     def test_multiline(self) -> None:
-        tokens = tokenize("shape\n{\n}")
+        tokens = tokenize("rules\n{\n}")
         assert tokens[0].line == 1
         assert tokens[1].line == 2
         assert tokens[2].line == 3
@@ -103,7 +104,7 @@ class TestLineColumn:
 class TestLexErrors:
     def test_unexpected_char(self) -> None:
         with pytest.raises(LexError, match="Unexpected character"):
-            tokenize("shape @")
+            tokenize("rules @")
 
     def test_unterminated_string(self) -> None:
         with pytest.raises(LexError, match="Unterminated string"):

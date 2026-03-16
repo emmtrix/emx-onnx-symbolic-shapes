@@ -1,4 +1,4 @@
-shape {
+rules {
   inputs input, split_sizes;
   outputs output;
   attributes axis, num_outputs;
@@ -6,5 +6,5 @@ shape {
   let ax = normalize_axis(axis, rank(input));
   let sizes = shape_value(split_sizes);
 
-  result output = split_shape(shape(input), ax, sizes);
+  result output.shape = split_shape(shape(input), ax, sizes);
 }

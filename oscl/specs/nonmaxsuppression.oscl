@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs boxes, scores;
   outputs selected_indices;
 
-  result selected_indices = [unknown_nonnegative(), 3];
+  result selected_indices.shape = [unknown_nonnegative(), 3];
 }
