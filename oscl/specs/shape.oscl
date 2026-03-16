@@ -1,7 +1,11 @@
 rules {
   inputs data;
+  attributes start, end;
   outputs output;
 
-  result output.shape = [rank(data)];
+  let sliced = subshape(shape(data), attribute("start", 0), attribute("end", rank(data)));
+
+  result output.shape = [rank(sliced)];
   result output.type = int64;
+  result output.value = sliced;
 }

@@ -284,6 +284,33 @@ def _builtin_prod(args: list[Any]) -> int | None:
     return result
 
 
+def _builtin_subshape(args: list[Any]) -> list[int | None]:
+    """``subshape(shape, start, end)`` Ã¢â‚¬â€œ slice a shape list."""
+    shape, start, end = args
+    dims = _to_shape(shape)
+    rank = len(dims)
+
+    if start is None:
+        start = 0
+    if end is None:
+        end = rank
+
+    start = int(start)
+    end = int(end)
+
+    if start < 0:
+        start = max(start + rank, 0)
+    if end < 0:
+        end = max(end + rank, 0)
+
+    start = min(max(start, 0), rank)
+    end = min(max(end, 0), rank)
+    if end < start:
+        end = start
+
+    return dims[start:end]
+
+
 def _builtin_unknown_nonnegative(args: list[Any]) -> None:
     """``unknown_nonnegative()`` â€“ unknown data-dependent dimension."""
     return _UNKNOWN
@@ -873,6 +900,7 @@ _BUILTINS: dict[str, Any] = {
     "squeeze_shape": _builtin_squeeze_shape,
     "unsqueeze_shape": _builtin_unsqueeze_shape,
     "prod": _builtin_prod,
+    "subshape": _builtin_subshape,
     "unknown_nonnegative": _builtin_unknown_nonnegative,
     # --- new built-ins ---
     "reduce_shape": _builtin_reduce_shape,
@@ -1140,7 +1168,7 @@ def _execute_spec(
     tensor_values: dict[str, list[int]] | None = None,
     elem_types: dict[str, Any] | None = None,
     attribute_protos: dict[str, Any] | None = None,
-) -> tuple[dict[str, list[int | None]], dict[str, int]]:
+) -> tuple[dict[str, list[int | None]], dict[str, int], dict[str, list[Any]]]:
     """Execute an OTSL spec and return the output shapes and element types.
 
     Parameters
@@ -1162,13 +1190,15 @@ def _execute_spec(
     Returns
     -------
     tuple
-        ``(shape_results, type_results)`` where *shape_results* maps output
-        names to inferred shapes and *type_results* maps output names to
-        inferred element types.
+        ``(shape_results, type_results, value_results)`` where *shape_results*
+        maps output names to inferred shapes, *type_results* maps output names
+        to inferred element types, and *value_results* maps output names to
+        flattened tensor values for shape-relevant outputs.
     """
     env = _EvalEnv(shapes, attributes, tensor_values, elem_types, attribute_protos)
     shape_results: dict[str, list[int | None]] = {}
     type_results: dict[str, int] = {}
+    value_results: dict[str, list[Any]] = {}
 
     for stmt in spec.statements:
         if isinstance(stmt, LetStmt):
@@ -1186,8 +1216,14 @@ def _execute_spec(
             elif stmt.field == "type":
                 val = _eval_expr(stmt.expr, env)
                 type_results[stmt.target] = int(val)
+            elif stmt.field == "value":
+                val = _eval_expr(stmt.expr, env)
+                if isinstance(val, (list, tuple)):
+                    value_results[stmt.target] = list(val)
+                else:
+                    value_results[stmt.target] = [val]
 
-    return shape_results, type_results
+    return shape_results, type_results, value_results
 
 
 # ---------------------------------------------------------------------------
@@ -1443,18 +1479,6 @@ def _infer_tensor_value_output(
 
     if op_type == "Cast" and len(node.input) >= 1 and node.input[0] in known_tensor_values:
         return list(known_tensor_values[node.input[0]])
-
-    if op_type == "Shape" and node.input and node.input[0] in known_shapes:
-        return _shape_tensor_values(known_shapes[node.input[0]])
-
-    if op_type == "Size" and node.input and node.input[0] in known_shapes:
-        values = _shape_tensor_values(known_shapes[node.input[0]])
-        if values is None:
-            return None
-        product = 1
-        for value in values:
-            product *= value
-        return [product]
 
     if op_type == "ConstantOfShape" and node.input and node.input[0] in known_tensor_values:
         dims = [int(v) for v in known_tensor_values[node.input[0]]]
@@ -1799,62 +1823,9 @@ class OsclShapeInferenceEngine:
                         n_axes = len(tensor_vals.get("starts", []))
                         tensor_vals["steps"] = [1] * n_axes
 
-            # Special case: Shape operator with start/end attributes
-            if node.op_type == "Shape":
-                first_in = node.input[0] if node.input else ""
-                if first_in in known_shapes:
-                    in_shape = known_shapes[first_in]
-                    tensor_values = _shape_tensor_values(in_shape)
-                    rank = len(in_shape)
-                    start = 0
-                    end = rank
-                    if "start" in node_attr_map:
-                        start = _get_attribute_value(node_attr_map["start"])
-                        if start < 0:
-                            start = max(start + rank, 0)
-                    if "end" in node_attr_map:
-                        end = _get_attribute_value(node_attr_map["end"])
-                        if end < 0:
-                            end = max(end + rank, 0)
-                    end = min(end, rank)
-                    out_len = max(end - start, 0)
-                    out_shape = [out_len]
-                    for onnx_out in node.output:
-                        if onnx_out:
-                            known_shapes[onnx_out] = out_shape
-                            known_elem_types[onnx_out] = TensorProto.INT64
-                            if tensor_values is not None:
-                                known_tensor_values[onnx_out] = tensor_values[start:end]
-                            tp = _make_type_proto(out_shape, TensorProto.INT64)
-                            known_types[onnx_out] = copy.deepcopy(tp)
-                            if onnx_out not in value_info_names:
-                                vi = graph.value_info.add()
-                                vi.name = onnx_out
-                                vi.type.CopyFrom(tp)
-                                value_info_names.add(onnx_out)
-                    continue
-
-            if node.op_type == "Size":
-                first_in = node.input[0] if node.input else ""
-                if first_in in known_shapes:
-                    values = _shape_tensor_values(known_shapes[first_in])
-                    if values is not None:
-                        product = 1
-                        for value in values:
-                            product *= value
-                        for onnx_out in node.output:
-                            if onnx_out:
-                                known_shapes[onnx_out] = []
-                                known_elem_types[onnx_out] = TensorProto.INT64
-                                known_tensor_values[onnx_out] = [product]
-                                tp = _make_type_proto([], TensorProto.INT64)
-                                known_types[onnx_out] = copy.deepcopy(tp)
-                                if onnx_out not in value_info_names:
-                                    vi = graph.value_info.add()
-                                    vi.name = onnx_out
-                                    vi.type.CopyFrom(tp)
-                                    value_info_names.add(onnx_out)
-                        continue
+            # Removed legacy Size special case; kept as an empty block to avoid churn here.
+            if False:
+                pass
 
             # Special case: Pad operator â€“ handle optional axes input
             if node.op_type == "Pad":
@@ -2008,7 +1979,7 @@ class OsclShapeInferenceEngine:
 
             # Execute the spec --------------------------------------------------
             try:
-                output_shapes, output_types = _execute_spec(
+                output_shapes, output_types, output_values = _execute_spec(
                     spec, input_shapes, attrs, tensor_vals,
                     elem_types=input_elem_types,
                     attribute_protos=node_attr_map,
@@ -2050,6 +2021,8 @@ class OsclShapeInferenceEngine:
                             vi.name = onnx_out
                             vi.type.CopyFrom(tp)
                             value_info_names.add(onnx_out)
+                    if out_name in output_values:
+                        known_tensor_values[onnx_out] = list(output_values[out_name])
 
                     try:
                         tensor_values = _infer_tensor_value_output(

@@ -4,4 +4,5 @@ rules {
 
   result output.shape = [];
   result output.type = int64;
+  result output.value = [prod(shape(data))];
 }
