@@ -107,13 +107,17 @@ OTSL defines the following semantic domains.
 
 ### Rank
 
-Rank is a non-negative integer.
+`rank(tensor)` is either a non-negative integer or `?`.
+
+`?` denotes unknown rank.
 
 Example:
 
 ```
 rank(A)
 ```
+
+If `rank(tensor)` is `?`, expressions that require a concrete rank are unresolved unless a built-in specification defines a different fallback behavior. Unknown rank does not by itself make inference `invalid`.
 
 ### Dim
 
@@ -146,7 +150,15 @@ There is no `sym("N")` constructor. Symbolic relationships arise from repeated u
 
 There is no `unknown_nonnegative()` constructor. All dimension terms are implicitly constrained to be non-negative because they denote tensor extents.
 
-Each evaluation of `?` produces a fresh unknown dimension term. Two syntactic occurrences of `?` are equal only if later constraints prove them equal.
+Each syntactic occurrence of `?` introduces a distinct fresh dimension variable. Two occurrences of `?` are considered equal only if later constraints unify them.
+
+Example:
+
+```
+[?, ?]
+```
+
+This shape introduces two independent dimension variables.
 
 ### Shape
 
@@ -158,6 +170,18 @@ Examples:
 []
 [dim(A,0), dim(B,1)]
 ```
+
+The relation between shape and rank is normative:
+
+```
+rank(T) = length(shape(T))
+```
+
+If `shape(T)` is known with length `k`, then `rank(T) = k`.
+
+If `rank(T)` is known but `shape(T)` is otherwise unknown, `shape(T)` is treated as a shape of length `rank(T)` whose entries are fresh unknown dimensions.
+
+If both `shape(T)` and `rank(T)` are unknown, any expression depending on their concrete length is unresolved.
 
 ### Type
 
@@ -193,6 +217,18 @@ dim(A,0) == dim(B,0)
 type(X) == type(Y)
 known(dim(A,0))
 ```
+
+### Type System Scope
+
+OTSL currently models only tensor element types.
+
+Composite ONNX types are outside the current DSL scope, including:
+
+- `sequence`
+- `map`
+- `optional`
+
+Semantics involving composite ONNX types must be handled by built-ins or by schema-level rules outside the core OTSL expression system.
 
 ---
 
@@ -310,7 +346,18 @@ Conditional expressions use three-valued predicate evaluation:
 
 - if `condition` is `true`, the result is `expr1`
 - if `condition` is `false`, the result is `expr2`
-- if `condition` is `unknown`, the conditional expression is unresolved unless both branches normalize to the same value
+- if `condition` is `unknown`, and `normalize(expr1)` and `normalize(expr2)` are structurally identical canonical expressions, the result is that canonical value
+- otherwise the conditional expression is unresolved
+
+Structural equality is equality of canonical normalized expression trees.
+
+Expressions depending on unknown rank are unresolved unless a built-in defines a specific fallback rule.
+
+Example:
+
+```
+if rank(A) == ? then prefix(shape(A),2) is unresolved
+```
 
 The DSL does not include:
 
@@ -322,7 +369,60 @@ The DSL does not include:
 
 Structural iteration must be expressed through built-ins. This keeps the language small and shifts complex, reusable algorithms into normatively specified helper functions.
 
-Dimension expressions are normalized only by deterministic local simplifications such as constant folding, substitution of solved equalities, and elimination of identity operations. General algebraic search or rearrangement is not required.
+Expressions that observe tensor shape and rank obey the following rules:
+
+1. `rank(T) = length(shape(T))`.
+2. If `shape(T)` is known with length `k`, then `rank(T)` is `k`.
+3. If `rank(T)` is known but `shape(T)` is otherwise unavailable, `shape(T)` is treated as a shape of length `rank(T)` whose entries are fresh unknown dimensions.
+4. If `rank(T)` is unknown, expressions depending on a concrete dimension count are unresolved.
+
+The built-in `dim(tensor,index)` obeys the following rules:
+
+1. If `rank(tensor)` is known and `index` is within bounds after any required negative-index normalization, return the corresponding dimension.
+2. If `rank(tensor)` is known and `index` is outside bounds, inference is `invalid`.
+3. If `rank(tensor)` is unknown, the result is an unresolved dimension term.
+4. Negative indices are normalized only when rank is known.
+
+### Dimension Expression Canonicalization
+
+Dimension expressions are normalized to a canonical form. Implementations must produce structurally identical canonical expressions for identical normalized terms.
+
+Canonicalization obeys the following rules:
+
+- addition and multiplication are associative and must be flattened
+- constant folding must be applied
+- identity elements must be removed
+- operands of commutative operators must be sorted deterministically
+
+Examples:
+
+```
+(a + (b + c)) -> (a + b + c)
+(a + 2 + 3) -> (a + 5)
+(a * 1) -> a
+(a * 0) -> 0
+```
+
+For commutative operators, operands must be sorted in the following order:
+
+1. constants
+2. direct dimension references such as `dim(A,i)`
+3. symbolic unknowns
+4. compound expressions
+
+Within each category, implementations must use a deterministic structural ordering derived from the canonical textual form of the operand after recursive normalization.
+
+Canonicalization includes:
+
+- recursive normalization of child expressions
+- substitution of solved equalities already available in the current environment
+- elimination of additive identity `0`
+- elimination of multiplicative identity `1`
+- collapse of multiplication by `0` to `0`
+- flattening of nested additions and nested multiplications
+- constant folding over normalized constant operands
+
+General algebraic search, factorization, distributivity-based rewriting, or non-deterministic rearrangement is not required and must not be applied.
 
 ---
 
@@ -343,6 +443,13 @@ Built-ins are:
 Built-ins may correspond directly to existing ONNX helper logic or existing `TypeAndShapeInferenceFunction` implementations, provided the semantics remain the normative semantics defined by this RFC.
 
 Built-ins are part of the OTSL specification. They are not implementation-defined extension points.
+
+If a built-in receives unknown rank or other unresolved inputs, it must either:
+
+- return an unresolved result
+- return the deterministic fallback result defined by its own specification
+
+A built-in must not fail solely because information is unavailable unless its specification explicitly requires concrete information as a validity condition.
 
 ### Common Built-ins
 
@@ -496,7 +603,27 @@ These built-ins correspond to normatively specified ONNX inference behavior and 
 
 ---
 
-## 10 Shape-carrying Inputs and Abstract Integer Sequences
+## 10 Built-in Library Governance
+
+Built-ins are part of the ONNX specification.
+
+Built-in names must be globally unique within the OTSL built-in library.
+
+Built-ins are versioned with the operator schema or opset version in which they are used normatively. A semantic change to a built-in requires the same review and versioning discipline applied to other normative ONNX operator semantics.
+
+Operator-specific built-ins must use descriptive names tied to operator semantics.
+
+Examples include:
+
+- `conv_output_shape`
+- `matmul_output_shape`
+- `slice_output_shape`
+
+New built-ins require ONNX specification review before becoming normative.
+
+---
+
+## 11 Shape-carrying Inputs and Abstract Integer Sequences
 
 Some ONNX operators accept tensor inputs whose statically available integer contents control type or shape inference. OTSL does not expose a dedicated `shape_tensors` statement. Instead, the surrounding operator schema identifies which inputs are shape-carrying for the built-ins that require them.
 
@@ -518,7 +645,7 @@ If the required contents are unavailable, the built-in must produce a conservati
 
 ---
 
-## 11 Partial Inference
+## 12 Partial Inference
 
 OTSL supports incomplete knowledge for both types and shapes.
 
@@ -546,9 +673,9 @@ Type inference may likewise remain unresolved when the rule block does not deter
 
 ---
 
-## 12 Constraint Solving and Built-in Constraint Predicates
+## 13 Constraint Solving and Built-in Constraint Predicates
 
-OTSL constraint solving is defined over normalized dimension and type terms. Let `normalize(t)` recursively substitute solved equalities into `t` and apply deterministic local simplifications such as constant folding.
+OTSL constraint solving is defined over normalized dimension and type terms. Let `normalize(t)` recursively substitute solved equalities into `t` and apply the canonicalization rules of section 8, including flattening of associative operators, removal of identity elements, constant folding, and deterministic operand ordering.
 
 Equality constraints on dimensions are processed using the following rules:
 
@@ -561,9 +688,49 @@ Equality constraints on dimensions are processed using the following rules:
 
 Cyclic bindings are contradictions and therefore `invalid`.
 
+If constraint solving derives an equation of the form:
+
+```
+d = d + k
+```
+
+where `k` is a positive known constant, inference is `invalid`.
+
+Examples of contradictions include:
+
+```
+dim(A,0) == dim(A,0) + 1
+dim(A,0) == -3
+```
+
 Every occurrence of `?` is fresh. If later equalities unify that fresh term with a constant, direct input dimension, or expression, that information propagates to every use of the same term created by that evaluation.
 
 Because dimensions denote tensor extents, any solved equality that forces a dimension to a negative known constant is a contradiction and therefore `invalid`.
+
+### Dimension Expression Canonicalization
+
+Canonicalization is part of the normative semantics of constraint solving.
+
+For normalized dimension expressions:
+
+- nested additions must be flattened into a single addition node
+- nested multiplications must be flattened into a single multiplication node
+- constant operands must be folded
+- additive identity `0` must be removed unless it is the only remaining operand
+- multiplicative identity `1` must be removed unless it is the only remaining operand
+- multiplication by `0` must normalize to `0`
+- operands of commutative operators must be sorted deterministically
+
+The required operand ordering is:
+
+1. constants
+2. direct dimension references
+3. symbolic unknowns
+4. compound expressions
+
+Within each class, operands are ordered by their canonical textual representation after recursive normalization.
+
+Two normalized expressions are structurally identical iff their canonical normalized expression trees are identical node-for-node and child-for-child. Independent implementations must therefore produce the same canonical expression tree for the same normalized term.
 
 Constraint propagation is monotonic and deterministic. Implementations may refine terms by:
 
@@ -605,7 +772,7 @@ Type equality and set membership are exact. No subtype relation is introduced.
 
 ---
 
-## 13 Approximation for Data-dependent Operators
+## 14 Approximation for Data-dependent Operators
 
 Some operators produce output shapes that depend on runtime tensor contents. OTSL must model these operators conservatively.
 
@@ -629,7 +796,7 @@ This rule is valid because:
 
 ---
 
-## 14 Example Specifications
+## 15 Example Specifications
 
 ### MatMul
 
@@ -693,7 +860,7 @@ This example has no loops, no structural iteration, and no dedicated shape-tenso
 
 ---
 
-## 15 Canonical Representation
+## 16 Canonical Representation
 
 The normative representation of OTSL is a structured AST. The textual syntax is a presentation format for authoring, review, and generated documentation.
 
@@ -710,6 +877,18 @@ Example (simplified JSON):
 {
   "statements": [
     {
+      "kind": "let",
+      "name": "batch",
+      "expr": {
+        "op": "builtin",
+        "name": "broadcast",
+        "args": [
+          { "op": "builtin", "name": "prefix", "args": [{ "op": "shape", "tensor": "A" }, { "op": "const", "value": 1 }] },
+          { "op": "builtin", "name": "prefix", "args": [{ "op": "shape", "tensor": "B" }, { "op": "const", "value": 1 }] }
+        ]
+      }
+    },
+    {
       "kind": "require",
       "expr": {
         "op": "eq",
@@ -723,12 +902,30 @@ Example (simplified JSON):
       "kind": "result",
       "target": { "tensor": "Y", "field": "shape" },
       "expr": {
-        "op": "builtin",
-        "name": "matmul_output_shape",
-        "args": [
-          { "op": "input", "name": "A" },
-          { "op": "input", "name": "B" }
-        ]
+        "op": "if",
+        "cond": {
+          "op": "eq",
+          "args": [
+            { "op": "rank", "tensor": "A" },
+            { "op": "const", "value": 1 }
+          ]
+        },
+        "then": {
+          "op": "builtin",
+          "name": "concat",
+          "args": [
+            { "op": "var", "name": "batch" },
+            { "op": "shape_lit", "args": [{ "op": "builtin", "name": "dim", "args": [{ "op": "input", "name": "B" }, { "op": "const", "value": -1 }] }] }
+          ]
+        },
+        "else": {
+          "op": "builtin",
+          "name": "matmul_output_shape",
+          "args": [
+            { "op": "input", "name": "A" },
+            { "op": "input", "name": "B" }
+          ]
+        }
       }
     },
     {
@@ -749,12 +946,28 @@ Example:
 ```cpp
 OpSchema()
   .SetTypeAndShapeRules(
+      Let(
+          "batch",
+          Builtin(
+              "broadcast",
+              Builtin("prefix", ShapeOf("A"), Const(1)),
+              Builtin("prefix", ShapeOf("B"), Const(1))
+          )
+      ),
       Require(
           Eq(TypeOf("A"), TypeOf("B"))
       ),
       Result(
           OutputField("Y", "shape"),
-          Builtin("matmul_output_shape", Input("A"), Input("B"))
+          If(
+              Eq(RankOf("A"), Const(1)),
+              Builtin(
+                  "concat",
+                  Var("batch"),
+                  ShapeLit(Builtin("dim", Input("B"), Const(-1)))
+              ),
+              Builtin("matmul_output_shape", Input("A"), Input("B"))
+          )
       ),
       Result(
           OutputField("Y", "type"),
@@ -767,7 +980,7 @@ The AST must encode only the minimal statement set plus the built-in calls and m
 
 ---
 
-## 16 Formal Evaluation Model
+## 17 Formal Evaluation Model
 
 Evaluation of an OTSL rule block is deterministic and proceeds as follows:
 
@@ -783,8 +996,18 @@ Evaluation of an OTSL rule block is deterministic and proceeds as follows:
    - return an exact value
    - return a symbolic or partial value containing direct dimension terms, expressions, or `?`
    - determine that the invocation is `invalid` under its specified error conditions
-10. After all statements have been processed, normalize every output expression with the final solved equalities.
-11. Classify the final result:
+10. A built-in observes the constraint environment available at the time it is evaluated. The result produced by that evaluation may therefore be less precise than the final normalized result.
+11. After all statements have been processed, every built-in result, intermediate binding, and output expression is normalized using the complete constraint set accumulated during evaluation.
+12. Example:
+
+```
+let s = broadcast(shape(A), shape(B))
+require dim(A,0) == dim(B,0)
+```
+
+The value of `s` may initially contain unresolved dimensions, but its final normalized form must reflect the equality constraint if that constraint resolves those dimensions.
+
+13. Classify the final result:
     - `invalid` if any contradiction or built-in error condition was derived
     - `exact` if every output type and dimension is fully known
     - `symbolic` if outputs are determined and contain expressions over known symbolic dimension terms but no `?`
@@ -795,7 +1018,7 @@ This algorithm defines the observable semantics. Implementations may optimize it
 
 ---
 
-## 17 Error Semantics
+## 18 Error Semantics
 
 Evaluation of OTSL rules may produce:
 
@@ -811,9 +1034,11 @@ Missing information is not an error. Proven contradiction is an error.
 
 ---
 
-## 18 Integration with ONNX
+## 19 Integration with ONNX
 
 Each `OpSchema` may include an OTSL rule specification.
+
+OTSL rules correspond to the operator-level inference functions currently registered in ONNX `OpSchema` definitions. Existing ONNX inference functions propagate types and shapes forward through the graph and may perform partial inference when full shape information is unavailable. OTSL is intended to specify those same operator-level semantics in a declarative, machine-readable form.
 
 OTSL rules are versioned with the ONNX operator schema or opset version to which they apply. Built-ins are likewise versioned by the schema context in which they are interpreted. A semantic change to a rule or a built-in requires the same schema versioning discipline already used by ONNX.
 
@@ -829,7 +1054,7 @@ Lack of OTSL support must not change ONNX model validity. It changes only the am
 
 ---
 
-## 19 Migration from Imperative Inference Functions
+## 20 Migration from Imperative Inference Functions
 
 Existing `TypeAndShapeInferenceFunction` implementations may be adopted incrementally by wrapping them as built-ins.
 
@@ -870,7 +1095,7 @@ This approach allows operator coverage to grow immediately while leaving room fo
 
 ---
 
-## 20 Reference Implementation Goals
+## 21 Reference Implementation Goals
 
 A reference implementation should:
 
@@ -890,7 +1115,7 @@ Suitable implementation languages include:
 
 ---
 
-## 21 Backward Compatibility
+## 22 Backward Compatibility
 
 This proposal does not modify ONNX graph semantics.
 
@@ -907,7 +1132,7 @@ Incremental migration through built-ins is explicitly compatible with current ON
 
 ---
 
-## 22 Future Work
+## 23 Future Work
 
 Possible future extensions include:
 
@@ -921,7 +1146,7 @@ Any future extension must preserve the determinism and minimal core syntax defin
 
 ---
 
-## 23 Conclusion
+## 24 Conclusion
 
 OTSL defines a normative, declarative, machine-readable specification for ONNX type and shape inference.
 
