@@ -3,5 +3,7 @@ shape {
   outputs output;
   attributes onesided;
 
-  result output = stft_shape(shape(signal), frame_step, window, onesided);
+  let fs = shape_value(frame_step);
+
+  result output = stft_shape(shape(signal), fs, shape(window), onesided);
 }

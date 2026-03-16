@@ -2,5 +2,7 @@ shape {
   inputs X, scales;
   outputs Y;
 
-  result Y = resize_shape(shape(X), scales, []);
+  let sc = shape_value(scales);
+
+  result Y = resize_shape(shape(X), sc, []);
 }

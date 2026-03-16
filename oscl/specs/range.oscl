@@ -1,0 +1,10 @@
+shape {
+  inputs start, limit, delta;
+  outputs output;
+
+  let s = shape_value(start);
+  let l = shape_value(limit);
+  let d = shape_value(delta);
+
+  result output = range_output_shape(s, l, d);
+}
