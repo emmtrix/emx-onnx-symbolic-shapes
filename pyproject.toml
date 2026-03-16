@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "oscl"
 version = "0.1.0"
-description = "Reference implementation of OSCL (ONNX Shape Constraint Language)"
+description = "Reference implementation of OTSL (ONNX Type and Shape Language)"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 

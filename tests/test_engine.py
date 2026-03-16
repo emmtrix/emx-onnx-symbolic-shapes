@@ -1,13 +1,13 @@
-"""Parametrized tests comparing the OSCL shape inference engine against the
+"""Parametrized tests comparing the OTSL shape inference engine against the
 official ONNX shape inference for all official ONNX node-level test cases
-of the operators covered by bundled OSCL specifications.
+of the operators covered by bundled OTSL specifications.
 
 Each test case:
 1. Collects the ONNX backend node test for a given operator.
 2. Enriches the model with constant-tensor initializers so that both engines
    have equivalent information.
 3. Runs the official ``onnx.shape_inference.infer_shapes``.
-4. Runs the OSCL-based ``oscl.engine.infer_shapes``.
+4. Runs the OTSL-based ``oscl.engine.infer_shapes``.
 5. Asserts the inferred output shapes are identical.
 """
 
@@ -42,10 +42,10 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"numpy\.")
 _ENGINE = OsclShapeInferenceEngine()
 
 # ---------------------------------------------------------------------------
-# Auto-discovery: ONNX op_type ↔ spec name ↔ ONNX test module name
+# Auto-discovery: ONNX op_type â†” spec name â†” ONNX test module name
 # ---------------------------------------------------------------------------
 
-# Reverse lookup: spec name (lowercase) → ONNX op_type (CamelCase), built
+# Reverse lookup: spec name (lowercase) â†’ ONNX op_type (CamelCase), built
 # from the ONNX operator schema registry.
 _SPEC_TO_OP_TYPE: dict[str, str] = {}
 for _schema in onnx.defs.get_all_schemas_with_history():
@@ -164,7 +164,7 @@ def _get_output_shapes(model: ModelProto) -> dict[str, list[int]]:
 # Test-case collection
 # ---------------------------------------------------------------------------
 
-# Known-limitation test names where the OSCL spec cannot match ONNX due to
+# Known-limitation test names where the OTSL spec cannot match ONNX due to
 # data-dependent output dimensions not covered by the spec.
 _XFAIL_CASES: set[str] = {
     # NonZero: second output dimension is data-dependent (unknown_nonnegative).
@@ -210,7 +210,7 @@ _XFAIL_CASES: set[str] = {
 
 def _build_test_params() -> list[pytest.param]:
     """Collect parametrized test entries for every operator that has both an
-    OSCL spec file and an ONNX backend test module."""
+    OTSL spec file and an ONNX backend test module."""
     params: list[pytest.param] = []
     for spec_name in sorted(_ENGINE._specs):
         op_type = _SPEC_TO_OP_TYPE.get(spec_name)
@@ -230,7 +230,7 @@ def _build_test_params() -> list[pytest.param]:
             if test_id in _XFAIL_CASES:
                 marks.append(
                     pytest.mark.xfail(
-                        reason="Known OSCL spec limitation", strict=True
+                        reason="Known OTSL spec limitation", strict=True
                     )
                 )
             params.append(pytest.param(tc, op_type, id=test_id, marks=marks))
@@ -247,7 +247,7 @@ _TEST_PARAMS = _build_test_params()
 
 @pytest.mark.parametrize("test_case, op_type", _TEST_PARAMS)
 def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
-    """Compare OSCL engine output shapes against ONNX official inference."""
+    """Compare OTSL engine output shapes against ONNX official inference."""
     model = test_case.model
     data_set = test_case.data_sets[0]
     input_arrays: list[np.ndarray] = list(data_set[0])
@@ -261,7 +261,7 @@ def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
     onnx_inferred = shape_inference.infer_shapes(enriched_model)
     onnx_shapes = _get_output_shapes(onnx_inferred)
 
-    # OSCL engine inference
+    # OTSL engine inference
     oscl_inferred = _ENGINE.infer_shapes(enriched_model)
     oscl_shapes = _get_output_shapes(oscl_inferred)
 
@@ -269,11 +269,11 @@ def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
     for out_name, onnx_shape in onnx_shapes.items():
         oscl_shape = oscl_shapes.get(out_name)
         assert oscl_shape is not None, (
-            f"OSCL engine did not produce shape for output {out_name!r}"
+            f"OTSL engine did not produce shape for output {out_name!r}"
         )
         assert oscl_shape == onnx_shape, (
             f"[{op_type}/{test_case.name}] output {out_name!r}: "
-            f"OSCL={oscl_shape} vs ONNX={onnx_shape}"
+            f"OTSL={oscl_shape} vs ONNX={onnx_shape}"
         )
 
 
@@ -304,7 +304,7 @@ def test_collected_test_count() -> None:
 
 
 class TestEngineBasic:
-    """Unit tests for the OSCL engine on hand-crafted models."""
+    """Unit tests for the OTSL engine on hand-crafted models."""
 
     @staticmethod
     def _simple_model(

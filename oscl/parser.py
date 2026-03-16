@@ -1,4 +1,4 @@
-"""Recursive‑descent parser for OSCL textual syntax."""
+"""Recursiveâ€‘descent parser for OTSL textual syntax."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class ParseError(Exception):
 
 
 class _Parser:
-    """Internal recursive‑descent parser state."""
+    """Internal recursiveâ€‘descent parser state."""
 
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
@@ -377,7 +377,7 @@ class _Parser:
 # ------------------------------------------------------------------
 
 def parse(source: str) -> ShapeSpec:
-    """Parse an OSCL source string and return a :class:`ShapeSpec` AST."""
+    """Parse an OTSL source string and return a :class:`ShapeSpec` AST."""
     tokens = tokenize(source)
     parser = _Parser(tokens)
     spec = parser.parse_spec()

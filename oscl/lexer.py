@@ -1,4 +1,4 @@
-"""Tokenizer for the OSCL textual syntax."""
+"""Tokenizer for the OTSL textual syntax."""
 
 from __future__ import annotations
 
@@ -126,7 +126,7 @@ class LexError(Exception):
 
 
 def tokenize(source: str) -> list[Token]:
-    """Tokenize an OSCL source string into a list of :class:`Token`."""
+    """Tokenize an OTSL source string into a list of :class:`Token`."""
     tokens: list[Token] = []
     i = 0
     line = 1

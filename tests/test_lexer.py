@@ -1,4 +1,4 @@
-"""Tests for the OSCL lexer."""
+"""Tests for the OTSL lexer."""
 
 from oscl.lexer import LexError, Token, TokenType, tokenize
 import pytest

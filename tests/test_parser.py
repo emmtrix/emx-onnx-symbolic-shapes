@@ -1,4 +1,4 @@
-"""Tests for the OSCL parser."""
+"""Tests for the OTSL parser."""
 
 from pathlib import Path
 

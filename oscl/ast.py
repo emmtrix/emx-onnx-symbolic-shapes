@@ -1,4 +1,4 @@
-"""AST node definitions for OSCL (ONNX Shape Constraint Language)."""
+"""AST node definitions for OTSL (ONNX Type and Shape Language)."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class NumberLit(Expr):
 
 @dataclass
 class UnknownDim(Expr):
-    """The ``?`` unknown‐dimension literal."""
+    """The ``?`` unknownâ€dimension literal."""
 
 
 @dataclass
@@ -139,19 +139,19 @@ class WhenStmt(Statement):
 
 
 # ---------------------------------------------------------------------------
-# Top‑level declarations and spec
+# Topâ€‘level declarations and spec
 # ---------------------------------------------------------------------------
 
 @dataclass
 class InputDecl:
-    """An input declaration — ``name`` or ``name[]`` (variadic)."""
+    """An input declaration â€” ``name`` or ``name[]`` (variadic)."""
     name: str
     variadic: bool = False
 
 
 @dataclass
 class ShapeSpec:
-    """Complete ``shape { … }`` specification."""
+    """Complete ``shape { â€¦ }`` specification."""
     inputs: list[InputDecl] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
     attributes: list[str] = field(default_factory=list)

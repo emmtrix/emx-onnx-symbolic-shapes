@@ -1,4 +1,4 @@
-# RFC: Declarative Type and Shape Rules for ONNX (OSCL)
+# RFC: Declarative Type and Shape Rules for ONNX (OTSL)
 
 ## Status
 
@@ -10,7 +10,7 @@ TBD
 
 ## Abstract
 
-This document proposes a declarative domain-specific language (DSL) for specifying type and shape inference rules for ONNX operators. The language, called **ONNX Shape Constraint Language (OSCL)**, allows operator schemas to define input/output type and shape relationships using symbolic expressions and constraints.
+This document proposes a declarative domain-specific language (DSL) for specifying type and shape inference rules for ONNX operators. The language, called **ONNX Type and Shape Language (OTSL)**, allows operator schemas to define input/output type and shape relationships using symbolic expressions and constraints.
 
 The goal is to replace or complement existing imperative type and shape inference implementations with a machine-readable, declarative specification that:
 
@@ -21,7 +21,7 @@ The goal is to replace or complement existing imperative type and shape inferenc
 - is suitable for static analysis
 - can be validated automatically
 
-OSCL remains the human-readable specification language, while the canonical representation is an AST embedded in the ONNX C++ `OpSchema` definition. OSCL is intended to become a normative representation of operator type and shape semantics while remaining compatible with existing ONNX models and runtimes.
+OTSL remains the human-readable specification language, while the canonical representation is an AST embedded in the ONNX C++ `OpSchema` definition. OTSL is intended to become a normative representation of operator type and shape semantics while remaining compatible with existing ONNX models and runtimes.
 
 ---
 
@@ -44,7 +44,7 @@ A declarative specification of type and shape rules enables:
 - improved tooling (compilers, optimizers, converters)
 - formal reasoning about graph transformations
 
-OSCL provides a compact and expressive language for describing these rules.
+OTSL provides a compact and expressive language for describing these rules.
 
 ---
 
@@ -71,7 +71,7 @@ The DSL must remain:
 
 ## 3 Non-Goals
 
-OSCL does not attempt to:
+OTSL does not attempt to:
 
 - describe full tensor computation semantics
 - evaluate arbitrary tensor values
@@ -82,19 +82,19 @@ OSCL does not attempt to:
 
 ## 4 Terminology
 
-| Term        | Meaning                                              |
-|-------------|------------------------------------------------------|
-| Rank        | number of tensor dimensions                          |
-| Dim         | single tensor dimension                              |
-| Shape       | ordered list of dimensions                           |
-| Type        | tensor element type                                  |
-| ShapeTensor | tensor whose runtime values represent shapes         |
+| Term        | Meaning                                      |
+|-------------|----------------------------------------------|
+| Rank        | number of tensor dimensions                  |
+| Dim         | single tensor dimension                      |
+| Shape       | ordered list of dimensions                   |
+| Type        | tensor element type                          |
+| ShapeTensor | tensor whose runtime values represent shapes |
 
 ---
 
 ## 5 Type System
 
-OSCL defines the following primitive types.
+OTSL defines the following primitive types.
 
 ### Rank
 
@@ -360,16 +360,16 @@ Shape tensor evaluation is restricted to inputs explicitly defined as shape tens
 
 ## 11 Partial Inference
 
-OSCL supports incomplete knowledge for both types and shapes.
+OTSL supports incomplete knowledge for both types and shapes.
 
 Possible dimension states:
 
-| State            | Example    |
-|------------------|------------|
-| known constant   | `32`       |
-| symbolic         | `sym("N")` |
-| expression       | `N + 5`    |
-| unknown          | `?`        |
+| State          | Example    |
+|----------------|------------|
+| known constant | `32`       |
+| symbolic       | `sym("N")` |
+| expression     | `N + 5`    |
+| unknown        | `?`        |
 
 Constraints may propagate relationships even if values are unknown.
 
@@ -515,7 +515,7 @@ The textual syntax is considered a presentation format.
 
 ### C++ Shape and Type Rule Representation
 
-OSCL text is only a presentation format. The canonical representation used by ONNX schemas is an AST embedded directly in the C++ `OpSchema` definition.
+OTSL text is only a presentation format. The canonical representation used by ONNX schemas is an AST embedded directly in the C++ `OpSchema` definition.
 
 Example:
 
@@ -542,7 +542,7 @@ OpSchema()
   );
 ```
 
-The OSCL textual syntax maps directly to this AST and remains the human-readable way to author and review rule blocks.
+The OTSL textual syntax maps directly to this AST and remains the human-readable way to author and review rule blocks.
 
 ---
 
@@ -550,13 +550,13 @@ The OSCL textual syntax maps directly to this AST and remains the human-readable
 
 Evaluation of type and shape rules may produce:
 
-| Status   | Meaning                         |
-|----------|---------------------------------|
-| exact    | type and shape fully known      |
-| symbolic | symbolic expressions present    |
-| partial  | incomplete dimensions or types  |
-| unknown  | inference not possible          |
-| invalid  | constraints violated            |
+| Status   | Meaning                        |
+|----------|--------------------------------|
+| exact    | type and shape fully known     |
+| symbolic | symbolic expressions present   |
+| partial  | incomplete dimensions or types |
+| unknown  | inference not possible         |
+| invalid  | constraints violated           |
 
 ---
 
@@ -564,7 +564,7 @@ Evaluation of type and shape rules may produce:
 
 Each `OpSchema` may optionally include a type and shape rule specification.
 
-The canonical representation is a C++ AST attached to the schema. The OSCL textual syntax maps directly to this AST and may be used for authoring, review, interchange, or generated documentation. Runtimes may ignore these rules if unsupported.
+The canonical representation is a C++ AST attached to the schema. The OTSL textual syntax maps directly to this AST and may be used for authoring, review, interchange, or generated documentation. Runtimes may ignore these rules if unsupported.
 
 Example:
 
@@ -582,7 +582,7 @@ Existing imperative inference functions may remain for backward compatibility.
 
 A prototype implementation should:
 
-- parse OSCL definitions
+- parse OTSL definitions
 - propagate symbolic shapes and element types through graphs
 - validate constraints
 - support partial inference
@@ -604,7 +604,7 @@ Existing models remain valid.
 
 Runtimes may:
 
-- ignore OSCL rules
+- ignore OTSL rules
 - use them for validation
 - use them for type and shape inference
 
@@ -623,6 +623,6 @@ Possible extensions include:
 
 ## 21 Conclusion
 
-OSCL introduces a declarative, machine-readable way to describe ONNX operator type and shape semantics.
+OTSL introduces a declarative, machine-readable way to describe ONNX operator type and shape semantics.
 
 This approach improves portability, tooling support, and formal verification while remaining compatible with existing ONNX infrastructure.
