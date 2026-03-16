@@ -1,4 +1,4 @@
-# agents.md - AI Agent Guidance
+# AGENTS.md - AI Agent Guidance
 
 This file provides context and instructions for AI coding agents working in this repository.
 
