@@ -2,6 +2,11 @@ rules {
   inputs X;
   outputs Y;
 
-  result Y.shape = if rank(X) == 1 then [unknown_nonnegative()] else [dim(X, 0), unknown_nonnegative()];
+  result Y.shape =
+    if attribute("stopwords", []) == []
+    then shape(X)
+    else if rank(X) == 1
+    then [unknown_nonnegative()]
+    else [dim(X, 0), unknown_nonnegative()];
   result Y.type = type(X);
 }

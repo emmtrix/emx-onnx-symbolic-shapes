@@ -1,8 +1,11 @@
 rules {
   inputs X, scales;
   outputs Y;
+  attributes axes;
 
-  let sc = shape_value(scales);
+  let raw_sc = shape_value(scales);
+  let ax = attribute("axes", []);
+  let sc = if raw_sc == [] then [] else overlay(raw_sc, ones(rank(X)), ax);
 
   result Y.shape = resize_shape(shape(X), sc, []);
   result Y.type = type(X);

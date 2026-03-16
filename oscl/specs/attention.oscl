@@ -1,7 +1,13 @@
 rules {
   inputs Q, K, V;
   outputs Y, present_key, present_value;
+  attributes q_num_heads, kv_num_heads;
 
-  result Y.shape = shape(Q);
+  let y_last =
+    if rank(Q) == 3 and q_num_heads != ? and kv_num_heads != ?
+    then q_num_heads * floordiv(dim(V, -1), kv_num_heads)
+    else dim(V, -1);
+
+  result Y.shape = concat(prefix(shape(Q), rank(Q) - 1), [y_last]);
   result Y.type = type(Q);
 }

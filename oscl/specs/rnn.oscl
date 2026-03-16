@@ -1,8 +1,10 @@
 rules {
   inputs X, W;
   outputs Y;
-  attributes hidden_size;
 
-  result Y.shape = rnn_shape(shape(X), hidden_size, 1);
+  let hs = dim(W, 1);
+  let nd = dim(W, 0);
+
+  result Y.shape = rnn_shape(shape(X), hs, nd);
   result Y.type = type(X);
 }

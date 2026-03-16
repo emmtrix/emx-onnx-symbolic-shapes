@@ -1,10 +1,13 @@
 rules {
   inputs data, axes;
   outputs reduced;
-  attributes keepdims, noop_with_empty_axes;
+  attributes axes, keepdims, noop_with_empty_axes;
 
-  let target_axes = shape_value(axes);
+  let input_axes = shape_value(axes);
+  let target_axes = if input_axes == [] then attribute("axes", []) else input_axes;
+  let kd = attribute("keepdims", 1);
+  let noop = attribute("noop_with_empty_axes", 0);
 
-  result reduced.shape = reduce_shape(shape(data), target_axes, keepdims);
+  result reduced.shape = if noop and target_axes == [] then shape(data) else reduce_shape(shape(data), target_axes, kd);
   result reduced.type = type(data);
 }

@@ -1,9 +1,11 @@
 rules {
   inputs data, shape_input;
   outputs reshaped;
+  attributes allowzero;
 
   let target = shape_value(shape_input);
+  let az = attribute("allowzero", 0);
 
-  result reshaped.shape = resolve_reshape(shape(data), target);
+  result reshaped.shape = resolve_reshape(shape(data), target, az);
   result reshaped.type = type(data);
 }

@@ -1,8 +1,10 @@
 rules {
-  inputs x, y_scale;
+  inputs x, y_scale, y_zero_point;
   outputs y;
-  attributes output_dtype;
 
   result y.shape = shape(x);
-  result y.type = output_dtype;
+  result y.type =
+    if attribute("output_dtype", 0) != 0
+    then attribute("output_dtype", 0)
+    else input_type("y_zero_point", uint8);
 }

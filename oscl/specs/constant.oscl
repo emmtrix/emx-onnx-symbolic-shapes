@@ -2,5 +2,6 @@ rules {
   inputs;
   outputs output;
 
-  result output.shape = [];
+  result output.shape = tensor_attribute_shape("value", []);
+  result output.type = tensor_attribute_type("value", undefined);
 }

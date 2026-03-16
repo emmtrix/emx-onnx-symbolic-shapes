@@ -1,8 +1,9 @@
 rules {
   inputs data;
   outputs transposed;
-  attributes perm;
 
-  result transposed.shape = permute(shape(data), perm);
+  let p = attribute("perm", reverse_perm(rank(data)));
+
+  result transposed.shape = permute(shape(data), p);
   result transposed.type = type(data);
 }

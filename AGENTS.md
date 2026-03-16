@@ -49,6 +49,7 @@ All implementation decisions must be grounded in the RFC. When the RFC is ambigu
 5. **Constraints vs. shapes.** `require` statements assert pre-conditions; `result` statements define outputs. Keep them separate.
 6. **AST representation.** New operators should be representable in the JSON AST format defined in RFC section 15.
 7. **Backward compatibility.** Changes must not invalidate existing ONNX models (RFC section 19).
+8. **No operator-specific engine semantics.** Do not implement ONNX operator behavior via `if node.op_type == ...` or similar special cases in the engine, evaluator, parser, or tests. Operator semantics must live in OTSL specs or in generic, operator-agnostic language/runtime primitives. The only acceptable use of `op_type` is spec lookup, diagnostics, or other purely generic dispatch that does not encode operator-specific inference logic.
 
 ## Suggested Implementation Structure
 
