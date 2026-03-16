@@ -1,0 +1,4 @@
+rules {
+  inputs num_mel_bins, dft_length, sample_rate, lower_edge_hertz, upper_edge_hertz;
+  outputs output;
+}

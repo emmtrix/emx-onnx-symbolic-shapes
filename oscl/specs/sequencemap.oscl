@@ -1,0 +1,4 @@
+rules {
+  inputs;
+  outputs output_sequence;
+}

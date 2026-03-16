@@ -1,0 +1,11 @@
+rules {
+  inputs x;
+  outputs y, y_scale, y_zero_point;
+
+  result y.shape = shape(x);
+  result y_scale.shape = [];
+  result y_zero_point.shape = [];
+  result y.type = uint8;
+  result y_scale.type = float;
+  result y_zero_point.type = uint8;
+}

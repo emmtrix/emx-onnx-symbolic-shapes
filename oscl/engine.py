@@ -1282,14 +1282,13 @@ class OsclShapeInferenceEngine:
         value_info_names = {vi.name for vi in graph.value_info}
 
         for node in graph.node:
-            if node.domain not in ("", "ai.onnx"):
-                raise NotImplementedError(
-                    "No OTSL spec available for operator "
-                    f"{node.op_type!r} in domain {node.domain!r}"
-                )
-
             spec_name = node.op_type.lower()
             if spec_name not in self._specs:
+                if node.domain:
+                    raise NotImplementedError(
+                        "No OTSL spec available for operator "
+                        f"{node.op_type!r} in domain {node.domain!r}"
+                    )
                 raise NotImplementedError(
                     f"No OTSL spec available for operator {node.op_type!r}"
                 )

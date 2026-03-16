@@ -1,0 +1,4 @@
+rules {
+  inputs x, shape;
+  outputs y;
+}

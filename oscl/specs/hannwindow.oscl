@@ -1,0 +1,10 @@
+rules {
+  inputs x;
+  outputs y;
+  attributes output_datatype;
+
+  let n = shape_value(x);
+
+  result y.shape = [n[0]];
+  result y.type = if output_datatype != 0 then output_datatype else float;
+}

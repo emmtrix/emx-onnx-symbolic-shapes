@@ -1,0 +1,8 @@
+rules {
+  inputs X, W, offset;
+  outputs Y;
+  attributes kernel_shape, strides, pads, dilations, group, auto_pad;
+
+  result Y.shape = conv_shape(shape(X), shape(W), kernel_shape, strides, pads, dilations, group, auto_pad);
+  result Y.type = type(X);
+}

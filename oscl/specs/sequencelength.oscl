@@ -1,0 +1,7 @@
+rules {
+  inputs input_sequence;
+  outputs length;
+
+  result length.shape = [];
+  result length.type = int64;
+}

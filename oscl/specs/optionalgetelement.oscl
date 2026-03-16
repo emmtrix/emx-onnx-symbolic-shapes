@@ -1,0 +1,7 @@
+rules {
+  inputs optional_input;
+  outputs output;
+
+  result output.shape = shape(optional_input);
+  result output.type = type(optional_input);
+}

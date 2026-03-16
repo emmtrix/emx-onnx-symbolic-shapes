@@ -1,0 +1,7 @@
+rules {
+  inputs optional_input;
+  outputs output;
+
+  result output.shape = [];
+  result output.type = bool;
+}

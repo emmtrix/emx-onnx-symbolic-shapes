@@ -1,0 +1,4 @@
+rules {
+  inputs sequence, tensor;
+  outputs output_sequence;
+}

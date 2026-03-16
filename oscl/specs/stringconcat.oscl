@@ -1,0 +1,7 @@
+rules {
+  inputs x, y;
+  outputs Y;
+
+  result Y.shape = broadcast(shape(x), shape(y));
+  result Y.type = string;
+}

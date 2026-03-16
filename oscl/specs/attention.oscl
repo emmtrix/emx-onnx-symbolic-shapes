@@ -1,0 +1,7 @@
+rules {
+  inputs Q, K, V;
+  outputs Y, present_key, present_value;
+
+  result Y.shape = shape(Q);
+  result Y.type = type(Q);
+}

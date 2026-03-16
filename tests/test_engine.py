@@ -238,12 +238,12 @@ class TestEngineBasic:
     def test_missing_spec_raises(self) -> None:
         """Operators without bundled OTSL specs must fail explicitly."""
         m = self._typed_model(
-            "DynamicQuantizeLinear",
+            "MissingSpecOp",
             [([2, 3], TensorProto.FLOAT)],
-            output_names=["y", "y_scale", "y_zero_point"],
+            output_names=["y"],
         )
         with pytest.raises(
-            NotImplementedError, match="DynamicQuantizeLinear"
+            NotImplementedError, match="MissingSpecOp"
         ):
             oscl_infer_shapes(m)
 
