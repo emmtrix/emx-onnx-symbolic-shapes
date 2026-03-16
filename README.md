@@ -20,6 +20,8 @@ The full specification is available in [`docs/rfc-otsl.md`](docs/rfc-otsl.md).
 
 Early draft / prototype stage. See the RFC for design details and open questions.
 
+The current generated test status page is available at [`docs/test-engine-status.md`](docs/test-engine-status.md).
+
 ## Contributing
 
 Contributions, feedback, and prototype implementations in Python, C++, or Rust are welcome.
