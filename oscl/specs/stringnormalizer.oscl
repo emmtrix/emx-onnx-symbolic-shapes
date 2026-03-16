@@ -2,6 +2,6 @@ rules {
   inputs X;
   outputs Y;
 
-  result Y.shape = shape(X);
-  result Y.type = string;
+  result Y.shape = if rank(X) == 1 then [unknown_nonnegative()] else [dim(X, 0), unknown_nonnegative()];
+  result Y.type = type(X);
 }
