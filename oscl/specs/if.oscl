@@ -1,4 +1,6 @@
 rules {
   inputs cond;
   outputs output;
+
+  result output.onnx_type = if_output_types();
 }

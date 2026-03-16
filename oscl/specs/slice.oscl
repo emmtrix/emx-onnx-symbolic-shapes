@@ -4,8 +4,10 @@ rules {
 
   let s = shape_value(starts);
   let e = shape_value(ends);
-  let ax = shape_value(axes);
-  let st = shape_value(steps);
+  let raw_ax = shape_value(axes);
+  let raw_st = shape_value(steps);
+  let ax = if raw_ax == [] then iota(rank(data)) else raw_ax;
+  let st = if raw_st == [] then repeat(1, rank(s)) else raw_st;
 
   result output.shape = slice_shape(shape(data), s, e, ax, st);
   result output.type = type(data);

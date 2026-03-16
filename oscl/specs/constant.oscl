@@ -2,6 +2,34 @@ rules {
   inputs;
   outputs output;
 
-  result output.shape = tensor_attribute_shape("value", []);
-  result output.type = tensor_attribute_type("value", undefined);
+  let t =
+    if attribute_value_type("value", undefined) != undefined then attribute_value_type("value", undefined)
+    else if attribute_value_type("value_int", undefined) != undefined then attribute_value_type("value_int", undefined)
+    else if attribute_value_type("value_float", undefined) != undefined then attribute_value_type("value_float", undefined)
+    else if attribute_value_type("value_ints", undefined) != undefined then attribute_value_type("value_ints", undefined)
+    else if attribute_value_type("value_floats", undefined) != undefined then attribute_value_type("value_floats", undefined)
+    else if attribute_value_type("value_string", undefined) != undefined then attribute_value_type("value_string", undefined)
+    else attribute_value_type("value_strings", undefined);
+
+  let s =
+    if attribute_value_type("value", undefined) != undefined then attribute_value_shape("value", [])
+    else if attribute_value_type("value_int", undefined) != undefined then attribute_value_shape("value_int", [])
+    else if attribute_value_type("value_float", undefined) != undefined then attribute_value_shape("value_float", [])
+    else if attribute_value_type("value_ints", undefined) != undefined then attribute_value_shape("value_ints", [])
+    else if attribute_value_type("value_floats", undefined) != undefined then attribute_value_shape("value_floats", [])
+    else if attribute_value_type("value_string", undefined) != undefined then attribute_value_shape("value_string", [])
+    else attribute_value_shape("value_strings", []);
+
+  let v =
+    if attribute_value_type("value", undefined) != undefined then attribute_values("value", [])
+    else if attribute_value_type("value_int", undefined) != undefined then attribute_values("value_int", [])
+    else if attribute_value_type("value_float", undefined) != undefined then attribute_values("value_float", [])
+    else if attribute_value_type("value_ints", undefined) != undefined then attribute_values("value_ints", [])
+    else if attribute_value_type("value_floats", undefined) != undefined then attribute_values("value_floats", [])
+    else if attribute_value_type("value_string", undefined) != undefined then attribute_values("value_string", [])
+    else attribute_values("value_strings", []);
+
+  result output.shape = s;
+  result output.type = t;
+  result output.value = v;
 }

@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 license = {text = "MIT"}
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "pytest-xdist>=3.6.0"]
 
 [tool.setuptools.packages.find]
 include = ["oscl*"]
@@ -20,3 +20,4 @@ oscl = ["specs/*.oscl"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-n auto"

@@ -121,6 +121,11 @@ class TestEngineBasic:
         result = oscl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [2, 3, 4]}
 
+    def test_split_without_num_outputs_uses_node_output_count(self) -> None:
+        m = self._simple_model("Split", [[2, 4]], output_names=["left", "right"], attrs={"axis": 1})
+        result = oscl_infer_shapes(m)
+        assert get_output_shapes(result) == {"left": [2, 2], "right": [2, 2]}
+
     def test_matmul_2d(self) -> None:
         m = self._simple_model("MatMul", [[3, 4], [4, 5]])
         result = oscl_infer_shapes(m)

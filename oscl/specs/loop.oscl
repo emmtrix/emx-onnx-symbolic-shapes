@@ -1,4 +1,6 @@
 rules {
   inputs;
   outputs output;
+
+  result output.onnx_type = loop_output_types();
 }

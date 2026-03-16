@@ -5,7 +5,8 @@ rules {
 
   let ax = normalize_axis(axis, rank(input));
   let sizes = shape_value(split_sizes);
+  let count = if num_outputs == 0 then output_count() else num_outputs;
 
-  result output.shape = split_shape(shape(input), ax, sizes);
+  result output.shape = split_shapes(shape(input), ax, sizes, count);
   result output.type = type(input);
 }

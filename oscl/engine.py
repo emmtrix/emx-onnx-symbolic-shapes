@@ -52,26 +52,26 @@ def _to_shape(val: Any) -> list[int | None]:
 
 
 def _builtin_shape(args: list[Any]) -> list[int | None]:
-    """``shape(X)`` â€“ return the shape of tensor *X*."""
+    """``shape(X)`` - return the shape of tensor *X*."""
     (val,) = args
     return _to_shape(val)
 
 
 def _builtin_dim(args: list[Any]) -> int | None:
-    """``dim(X, i)`` â€“ return dimension *i* (supports negative indexing)."""
+    """``dim(X, i)`` - return dimension *i* (supports negative indexing)."""
     shape, idx = args
     shape = _to_shape(shape)
     return shape[idx]
 
 
 def _builtin_rank(args: list[Any]) -> int:
-    """``rank(X)`` â€“ number of dimensions."""
+    """``rank(X)`` - number of dimensions."""
     (val,) = args
     return len(_to_shape(val))
 
 
 def _builtin_prefix(args: list[Any]) -> list[int | None]:
-    """``prefix(X, k)`` â€“ first *k* dimensions (negative *k* â‡’ all but last |k|)."""
+    """``prefix(X, k)`` - first *k* dimensions (negative *k* -> all but last |k|)."""
     shape, k = args
     shape = _to_shape(shape)
     if k < 0:
@@ -81,7 +81,7 @@ def _builtin_prefix(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_suffix(args: list[Any]) -> list[int | None]:
-    """``suffix(X, k)`` â€“ dimensions from index *k* onwards."""
+    """``suffix(X, k)`` - dimensions from index *k* onwards."""
     shape, k = args
     shape = _to_shape(shape)
     return shape[k:]
@@ -114,7 +114,7 @@ def _builtin_broadcast(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_concat(args: list[Any]) -> list[int | None]:
-    """``concat(s1, s2)`` â€“ concatenate two shapes."""
+    """``concat(s1, s2)`` - concatenate two shapes."""
     s1, s2 = args
     return _to_shape(s1) + _to_shape(s2)
 
@@ -146,7 +146,7 @@ def _builtin_concat_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_permute(args: list[Any]) -> list[int | None]:
-    """``permute(shape, perm)`` â€“ reorder dimensions."""
+    """``permute(shape, perm)`` - reorder dimensions."""
     shape, perm = args
     shape = _to_shape(shape)
     perm = list(perm)
@@ -154,7 +154,7 @@ def _builtin_permute(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_normalize_axis(args: list[Any]) -> int:
-    """``normalize_axis(axis, rank)`` â€“ handle negative axis values."""
+    """``normalize_axis(axis, rank)`` - handle negative axis values."""
     axis, rank = args
     if axis < 0:
         axis += rank
@@ -171,6 +171,29 @@ def _builtin_ones(args: list[Any]) -> list[int]:
     """``ones(rank)`` - list of ones of length *rank*."""
     (rank,) = args
     return [1] * rank
+
+
+def _builtin_iota(args: list[Any]) -> list[int]:
+    """``iota(n)`` - ascending integer list [0, ..., n-1]."""
+    (count,) = args
+    return list(range(int(count)))
+
+
+def _builtin_repeat(args: list[Any]) -> list[Any]:
+    """``repeat(value, count)`` - repeat a value count times."""
+    value, count = args
+    return [value] * int(count)
+
+
+def _builtin_length(args: list[Any]) -> int:
+    """``length(value)`` - length of a list-like value."""
+    (value,) = args
+    return len(value)
+
+
+def _eval_output_count_func(env: _EvalEnv) -> int:
+    """Evaluate ``output_count()`` for the current ONNX node."""
+    return len(env.node_output_types)
 
 
 def _builtin_overlay(args: list[Any]) -> list[int | None]:
@@ -200,10 +223,10 @@ def _builtin_floordiv(args: list[Any]) -> int | None:
 
 
 def _builtin_resolve_reshape(args: list[Any]) -> list[int | None]:
-    """``resolve_reshape(input_shape, target)`` â€“ ONNX reshape semantics.
+    """``resolve_reshape(input_shape, target)`` - ONNX reshape semantics.
 
-    * ``0`` in *target* â†’ copy from *input_shape* (unless *allowzero* is set).
-    * ``-1`` in *target* â†’ infer from total size.
+    * ``0`` in *target* -> copy from *input_shape* (unless *allowzero* is set).
+    * ``-1`` in *target* -> infer from total size.
 
     An optional third argument ``allowzero`` (default 0) controls whether
     ``0`` means "copy" (0) or literal zero (1).
@@ -250,7 +273,7 @@ def _builtin_resolve_reshape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_squeeze_shape(args: list[Any]) -> list[int | None]:
-    """``squeeze_shape(shape, axes)`` â€“ remove dimensions at *axes*."""
+    """``squeeze_shape(shape, axes)`` - remove dimensions at *axes*."""
     shape, axes = args
     shape = _to_shape(shape)
     axes = list(axes)
@@ -260,7 +283,7 @@ def _builtin_squeeze_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_unsqueeze_shape(args: list[Any]) -> list[int | None]:
-    """``unsqueeze_shape(shape, axes)`` â€“ insert 1-dimensions at *axes*."""
+    """``unsqueeze_shape(shape, axes)`` - insert 1-dimensions at *axes*."""
     shape, axes = args
     shape = _to_shape(shape)
     axes = list(axes)
@@ -273,7 +296,7 @@ def _builtin_unsqueeze_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_prod(args: list[Any]) -> int | None:
-    """``prod(shape)`` â€“ product of dimension values."""
+    """``prod(shape)`` - product of dimension values."""
     (vals,) = args
     vals = _to_shape(vals)
     result = 1
@@ -285,7 +308,7 @@ def _builtin_prod(args: list[Any]) -> int | None:
 
 
 def _builtin_subshape(args: list[Any]) -> list[int | None]:
-    """``subshape(shape, start, end)`` Ã¢â‚¬â€œ slice a shape list."""
+    """``subshape(shape, start, end)`` - slice a shape list."""
     shape, start, end = args
     dims = _to_shape(shape)
     rank = len(dims)
@@ -312,17 +335,17 @@ def _builtin_subshape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_unknown_nonnegative(args: list[Any]) -> None:
-    """``unknown_nonnegative()`` â€“ unknown data-dependent dimension."""
+    """``unknown_nonnegative()`` - unknown data-dependent dimension."""
     return _UNKNOWN
 
 
 def _builtin_reduce_shape(args: list[Any]) -> list[int | None]:
-    """``reduce_shape(shape, axes, keepdims)`` â€“ compute output shape of reduction."""
+    """``reduce_shape(shape, axes, keepdims)`` - compute output shape of reduction."""
     shape, axes, keepdims = args
     shape = _to_shape(shape)
     rank = len(shape)
     if not axes:
-        # Empty axes â†’ reduce all dimensions
+        # Empty axes -> reduce all dimensions
         normalised = set(range(rank))
     else:
         axes = list(axes)
@@ -339,7 +362,7 @@ def _builtin_reduce_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_tile_shape(args: list[Any]) -> list[int | None]:
-    """``tile_shape(shape, repeats)`` â€“ multiply dims by repeats."""
+    """``tile_shape(shape, repeats)`` - multiply dims by repeats."""
     shape, repeats = args
     shape = _to_shape(shape)
     repeats = list(repeats)
@@ -355,7 +378,7 @@ def _builtin_tile_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_slice_shape(args: list[Any]) -> list[int | None]:
-    """``slice_shape(shape, starts, ends, axes, steps)`` â€“ ONNX Slice output shape."""
+    """``slice_shape(shape, starts, ends, axes, steps)`` - ONNX Slice output shape."""
     shape, starts, ends, axes, steps = args
     shape = _to_shape(shape)
     rank = len(shape)
@@ -402,7 +425,7 @@ def _builtin_slice_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_pad_shape(args: list[Any]) -> list[int | None]:
-    """``pad_shape(shape, pads, axes)`` â€“ add padding to shape dimensions."""
+    """``pad_shape(shape, pads, axes)`` - add padding to shape dimensions."""
     shape = _to_shape(args[0])
     pads = list(args[1])
     axes = list(args[2]) if len(args) > 2 and args[2] else None
@@ -434,7 +457,7 @@ def _builtin_pad_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_split_shape(args: list[Any]) -> list[int | None]:
-    """``split_shape(shape, axis, sizes)`` â€“ compute first split output shape.
+    """``split_shape(shape, axis, sizes)`` - compute first split output shape.
 
     For the Split operator we only compute the *first* output here.
     The engine handles the multi-output case specially.
@@ -445,6 +468,36 @@ def _builtin_split_shape(args: list[Any]) -> list[int | None]:
     if sizes:
         result[axis] = sizes[0]
     return result
+
+
+def _builtin_split_shapes(args: list[Any]) -> list[list[int | None]]:
+    """``split_shapes(shape, axis, sizes, num_outputs)`` - compute all split shapes."""
+    input_shape, axis, sizes, num_outputs = args
+    shape = _to_shape(input_shape)
+    axis = int(axis)
+    rank = len(shape)
+    if axis < 0:
+        axis += rank
+
+    split_sizes = list(sizes) if sizes else []
+    if not split_sizes:
+        count = int(num_outputs)
+        if count <= 0:
+            return []
+        dim = shape[axis]
+        if dim is None:
+            split_sizes = [None] * count
+        else:
+            base = dim // count
+            remainder = dim % count
+            split_sizes = [base + (1 if i < remainder else 0) for i in range(count)]
+
+    outputs: list[list[int | None]] = []
+    for size in split_sizes:
+        out_shape = list(shape)
+        out_shape[axis] = size
+        outputs.append(out_shape)
+    return outputs
 
 
 def _builtin_pool_shape(args: list[Any]) -> list[int | None]:
@@ -497,7 +550,7 @@ def _builtin_pool_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_global_pool_shape(args: list[Any]) -> list[int | None]:
-    """``global_pool_shape(input)`` â€“ [N, C, 1, 1, ...]."""
+    """``global_pool_shape(input)`` - [N, C, 1, 1, ...]."""
     (input_shape,) = args
     input_shape = _to_shape(input_shape)
     spatial_rank = len(input_shape) - 2
@@ -601,7 +654,7 @@ def _builtin_depthtospace_shape(args: list[Any]) -> list[int | None]:
     """``depthtospace_shape(shape, blocksize)``."""
     shape, bs = args
     shape = _to_shape(shape)
-    # [N, C, H, W] â†’ [N, C/(bs*bs), H*bs, W*bs]
+    # [N, C, H, W] -> [N, C/(bs*bs), H*bs, W*bs]
     if len(shape) < 4:
         return shape
     n, c = shape[0], shape[1]
@@ -734,7 +787,7 @@ def _builtin_gridsample_shape(args: list[Any]) -> list[int | None]:
 
 
 def _builtin_einsum_shape(args: list[Any]) -> list[int | None]:
-    """``einsum_shape(Xs, equation)`` â€“ compute output shape from einsum equation."""
+    """``einsum_shape(Xs, equation)`` - compute output shape from einsum equation."""
     xs, equation = args
     if isinstance(equation, bytes):
         equation = equation.decode("utf-8")
@@ -880,6 +933,12 @@ def _builtin_range_output_shape(args: list[Any]) -> list[int | None]:
     return [_UNKNOWN]
 
 
+def _builtin_sequence_type(args: list[Any]) -> TypeProto:
+    """``sequence_type(shape, elem_type)`` - construct a sequence-of-tensor type."""
+    shape, elem_type = args
+    return _make_sequence_type_proto(_to_shape(shape), int(elem_type))
+
+
 _BUILTINS: dict[str, Any] = {
     "shape": _builtin_shape,
     "dim": _builtin_dim,
@@ -893,6 +952,9 @@ _BUILTINS: dict[str, Any] = {
     "normalize_axis": _builtin_normalize_axis,
     "reverse_perm": _builtin_reverse_perm,
     "ones": _builtin_ones,
+    "iota": _builtin_iota,
+    "repeat": _builtin_repeat,
+    "length": _builtin_length,
     "overlay": _builtin_overlay,
     "floordiv": _builtin_floordiv,
     "shape_value": lambda args: list(args[0]),  # identity; value already resolved
@@ -908,6 +970,7 @@ _BUILTINS: dict[str, Any] = {
     "slice_shape": _builtin_slice_shape,
     "pad_shape": _builtin_pad_shape,
     "split_shape": _builtin_split_shape,
+    "split_shapes": _builtin_split_shapes,
     "pool_shape": _builtin_pool_shape,
     "global_pool_shape": _builtin_global_pool_shape,
     "conv_shape": _builtin_conv_shape,
@@ -928,6 +991,7 @@ _BUILTINS: dict[str, Any] = {
     "stft_shape": _builtin_stft_shape,
     "col2im_shape": _builtin_col2im_shape,
     "range_output_shape": _builtin_range_output_shape,
+    "sequence_type": _builtin_sequence_type,
 }
 
 
@@ -971,12 +1035,18 @@ class _EvalEnv:
         tensor_values: dict[str, list[int]] | None = None,
         elem_types: dict[str, Any] | None = None,
         attribute_protos: dict[str, Any] | None = None,
+        full_types: dict[str, Any] | None = None,
+        node_input_types: list[Any] | None = None,
+        node_output_types: list[Any] | None = None,
     ) -> None:
         self.shapes = dict(shapes)
         self.attributes = dict(attributes)
         self.tensor_values = dict(tensor_values or {})
         self.elem_types: dict[str, Any] = dict(elem_types or {})
         self.attribute_protos: dict[str, Any] = dict(attribute_protos or {})
+        self.full_types: dict[str, Any] = dict(full_types or {})
+        self.node_input_types: list[Any] = list(node_input_types or [])
+        self.node_output_types: list[Any] = list(node_output_types or [])
         self.variables: dict[str, Any] = {}
         # Type name constants (resolve bare identifiers like ``int64``)
         self.variables.update(_TYPE_NAME_CONSTANTS)
@@ -1070,6 +1140,82 @@ def _eval_type_func(arg: Expr, env: _EvalEnv) -> int:
     return TensorProto.UNDEFINED
 
 
+def _eval_full_type_func(arg: Expr, env: _EvalEnv) -> TypeProto | None:
+    """Evaluate ``full_type(expr)`` by looking up the full ONNX type."""
+    if isinstance(arg, Identifier):
+        tp = env.full_types.get(arg.name)
+        if tp is not None:
+            return copy.deepcopy(tp)
+    return None
+
+
+def _eval_unwrap_optional_type_func(call: FuncCall, env: _EvalEnv) -> TypeProto | None:
+    """Evaluate ``unwrap_optional_type(x)`` by stripping one optional layer."""
+    tp = _eval_full_type_func(call.args[0], env)
+    if tp is None:
+        return None
+    if tp.HasField("optional_type"):
+        return copy.deepcopy(tp.optional_type.elem_type)
+    return copy.deepcopy(tp)
+
+
+def _unwrap_optional_type_proto(tp: TypeProto) -> TypeProto:
+    """Strip one optional wrapper from a TypeProto if present."""
+    if tp.HasField("optional_type"):
+        return copy.deepcopy(tp.optional_type.elem_type)
+    return copy.deepcopy(tp)
+
+
+def _eval_if_output_types_func(env: _EvalEnv) -> list[TypeProto]:
+    """Evaluate merged output types for an If node from branch graph attrs."""
+    then_branch = env.attribute_protos.get("then_branch")
+    else_branch = env.attribute_protos.get("else_branch")
+    if then_branch is None or else_branch is None:
+        return []
+    result: list[TypeProto] = []
+    for then_out, else_out in zip(then_branch.g.output, else_branch.g.output):
+        result.append(_merge_type_protos(then_out.type, else_out.type))
+    return result
+
+
+def _eval_loop_output_types_func(env: _EvalEnv) -> list[TypeProto]:
+    """Evaluate Loop output types from the body graph and carried inputs."""
+    body_attr = env.attribute_protos.get("body")
+    if body_attr is None:
+        return []
+    result: list[TypeProto] = []
+    carried_input_types = env.node_input_types[2:]
+    output_count = max(0, len(body_attr.g.output) - 1)
+    for index in range(output_count):
+        body_index = index + 1
+        output_tp = copy.deepcopy(body_attr.g.output[body_index].type)
+        existing_output_tp = (
+            env.node_output_types[index]
+            if index < len(env.node_output_types)
+            else None
+        )
+        if index < len(carried_input_types) and carried_input_types[index] is not None:
+            carried_input_tp = carried_input_types[index]
+            if (
+                carried_input_tp.HasField("optional_type")
+                and existing_output_tp is not None
+                and existing_output_tp.HasField("sequence_type")
+                and existing_output_tp.sequence_type.elem_type.HasField("tensor_type")
+                and not existing_output_tp.sequence_type.elem_type.tensor_type.HasField("shape")
+            ):
+                output_tp = copy.deepcopy(existing_output_tp)
+            elif not (
+                carried_input_tp.HasField("optional_type")
+                and output_tp.HasField("sequence_type")
+                and output_tp.sequence_type.elem_type.HasField("tensor_type")
+                and not output_tp.sequence_type.elem_type.tensor_type.HasField("shape")
+            ):
+                carried_tp = _unwrap_optional_type_proto(carried_input_tp)
+                output_tp = _merge_type_protos(output_tp, carried_tp)
+        result.append(output_tp)
+    return result
+
+
 def _eval_attribute_func(call: FuncCall, env: _EvalEnv) -> Any:
     """Evaluate ``attribute(name, default)`` against runtime attributes."""
     name = _eval_expr(call.args[0], env)
@@ -1104,6 +1250,55 @@ def _eval_tensor_attribute_shape_func(call: FuncCall, env: _EvalEnv) -> list[int
     return list(attr.t.dims)
 
 
+def _eval_tensor_attribute_values_func(call: FuncCall, env: _EvalEnv) -> list[Any]:
+    """Evaluate ``tensor_attribute_values(name, default)`` generically."""
+    name = _eval_expr(call.args[0], env)
+    default = _eval_expr(call.args[1], env) if len(call.args) > 1 else []
+    attr = env.attribute_protos.get(name)
+    if attr is None or attr.type != onnx.AttributeProto.TENSOR:
+        return list(default) if isinstance(default, (list, tuple)) else [default]
+    values = _get_tensor_values(attr.t)
+    if values is None:
+        return list(default) if isinstance(default, (list, tuple)) else [default]
+    return list(values)
+
+
+def _eval_attribute_value_type_func(call: FuncCall, env: _EvalEnv) -> int:
+    """Evaluate ``attribute_value_type(name, default)`` generically."""
+    name = _eval_expr(call.args[0], env)
+    default = _eval_expr(call.args[1], env) if len(call.args) > 1 else TensorProto.UNDEFINED
+    attr = env.attribute_protos.get(name)
+    if attr is None:
+        return default
+    return _get_attribute_value_type(attr)
+
+
+def _eval_attribute_value_shape_func(call: FuncCall, env: _EvalEnv) -> list[int | None]:
+    """Evaluate ``attribute_value_shape(name, default)`` generically."""
+    name = _eval_expr(call.args[0], env)
+    default = _eval_expr(call.args[1], env) if len(call.args) > 1 else []
+    attr = env.attribute_protos.get(name)
+    if attr is None:
+        return _to_shape(default)
+    shape = _get_attribute_value_shape(attr)
+    if shape is None:
+        return _to_shape(default)
+    return shape
+
+
+def _eval_attribute_values_func(call: FuncCall, env: _EvalEnv) -> list[Any]:
+    """Evaluate ``attribute_values(name, default)`` generically."""
+    name = _eval_expr(call.args[0], env)
+    default = _eval_expr(call.args[1], env) if len(call.args) > 1 else []
+    attr = env.attribute_protos.get(name)
+    if attr is None:
+        return list(default) if isinstance(default, (list, tuple)) else [default]
+    values = _get_attribute_values(attr)
+    if values is None:
+        return list(default) if isinstance(default, (list, tuple)) else [default]
+    return list(values)
+
+
 def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     """Evaluate a function call."""
     name = call.name
@@ -1111,6 +1306,21 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     # type() needs special handling: resolve element type, not shape
     if name == "type":
         return _eval_type_func(call.args[0], env)
+
+    if name == "full_type":
+        return _eval_full_type_func(call.args[0], env)
+
+    if name == "unwrap_optional_type":
+        return _eval_unwrap_optional_type_func(call, env)
+
+    if name == "if_output_types":
+        return _eval_if_output_types_func(env)
+
+    if name == "loop_output_types":
+        return _eval_loop_output_types_func(env)
+
+    if name == "output_count":
+        return _eval_output_count_func(env)
 
     if name == "attribute":
         return _eval_attribute_func(call, env)
@@ -1123,6 +1333,18 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
 
     if name == "tensor_attribute_shape":
         return _eval_tensor_attribute_shape_func(call, env)
+
+    if name == "tensor_attribute_values":
+        return _eval_tensor_attribute_values_func(call, env)
+
+    if name == "attribute_value_type":
+        return _eval_attribute_value_type_func(call, env)
+
+    if name == "attribute_value_shape":
+        return _eval_attribute_value_shape_func(call, env)
+
+    if name == "attribute_values":
+        return _eval_attribute_values_func(call, env)
 
     # shape_value needs special handling: resolve tensor values, not shape
     if name == "shape_value":
@@ -1168,7 +1390,10 @@ def _execute_spec(
     tensor_values: dict[str, list[int]] | None = None,
     elem_types: dict[str, Any] | None = None,
     attribute_protos: dict[str, Any] | None = None,
-) -> tuple[dict[str, list[int | None]], dict[str, int], dict[str, list[Any]]]:
+    full_types: dict[str, Any] | None = None,
+    node_input_types: list[Any] | None = None,
+    node_output_types: list[Any] | None = None,
+) -> tuple[dict[str, list[int | None]], dict[str, int], dict[str, list[Any]], dict[str, Any]]:
     """Execute an OTSL spec and return the output shapes and element types.
 
     Parameters
@@ -1190,15 +1415,26 @@ def _execute_spec(
     Returns
     -------
     tuple
-        ``(shape_results, type_results, value_results)`` where *shape_results*
+        ``(shape_results, type_results, value_results, onnx_type_results)`` where *shape_results*
         maps output names to inferred shapes, *type_results* maps output names
-        to inferred element types, and *value_results* maps output names to
-        flattened tensor values for shape-relevant outputs.
+        to inferred element types, *value_results* maps output names to
+        flattened tensor values for shape-relevant outputs, and
+        *onnx_type_results* maps output names to full ONNX type protos.
     """
-    env = _EvalEnv(shapes, attributes, tensor_values, elem_types, attribute_protos)
+    env = _EvalEnv(
+        shapes,
+        attributes,
+        tensor_values,
+        elem_types,
+        attribute_protos,
+        full_types,
+        node_input_types,
+        node_output_types,
+    )
     shape_results: dict[str, list[int | None]] = {}
     type_results: dict[str, int] = {}
     value_results: dict[str, list[Any]] = {}
+    onnx_type_results: dict[str, Any] = {}
 
     for stmt in spec.statements:
         if isinstance(stmt, LetStmt):
@@ -1222,8 +1458,14 @@ def _execute_spec(
                     value_results[stmt.target] = list(val)
                 else:
                     value_results[stmt.target] = [val]
+            elif stmt.field == "onnx_type":
+                val = _eval_expr(stmt.expr, env)
+                if isinstance(val, TypeProto):
+                    onnx_type_results[stmt.target] = copy.deepcopy(val)
+                elif isinstance(val, list) and all(isinstance(item, TypeProto) for item in val):
+                    onnx_type_results[stmt.target] = list(val)  # type: ignore[assignment]
 
-    return shape_results, type_results, value_results
+    return shape_results, type_results, value_results, onnx_type_results
 
 
 # ---------------------------------------------------------------------------
@@ -1274,6 +1516,8 @@ _DEFAULT_ATTRS: dict[str, dict[str, Any]] = {
 
 def _get_shape_from_type(tp: TypeProto) -> list[int | None] | None:
     """Extract a concrete shape from an ONNX TypeProto (None = unknown dim)."""
+    if tp.HasField("optional_type"):
+        return _get_shape_from_type(tp.optional_type.elem_type)
     if not tp.HasField("tensor_type"):
         return None
     tt = tp.tensor_type
@@ -1284,7 +1528,7 @@ def _get_shape_from_type(tp: TypeProto) -> list[int | None] | None:
         if d.dim_value > 0:
             dims.append(d.dim_value)
         elif d.dim_param:
-            dims.append(None)  # symbolic â†’ unknown
+            dims.append(None)  # symbolic -> unknown
         else:
             # dim_value == 0 can mean unknown or scalar dim
             dims.append(None)
@@ -1293,6 +1537,8 @@ def _get_shape_from_type(tp: TypeProto) -> list[int | None] | None:
 
 def _get_elem_type(tp: TypeProto) -> int:
     """Extract element type from ONNX TypeProto."""
+    if tp.HasField("optional_type"):
+        return _get_elem_type(tp.optional_type.elem_type)
     if tp.HasField("tensor_type"):
         return tp.tensor_type.elem_type
     return TensorProto.UNDEFINED
@@ -1572,6 +1818,50 @@ def _get_attribute_value(attr: onnx.AttributeProto) -> Any:
     return None
 
 
+def _get_attribute_value_shape(attr: onnx.AttributeProto) -> list[int | None] | None:
+    """Return the tensor-like shape of an ONNX attribute value."""
+    if attr.type == onnx.AttributeProto.TENSOR:
+        return list(attr.t.dims)
+    if attr.type in (
+        onnx.AttributeProto.INT,
+        onnx.AttributeProto.FLOAT,
+        onnx.AttributeProto.STRING,
+    ):
+        return []
+    if attr.type == onnx.AttributeProto.INTS:
+        return [len(attr.ints)]
+    if attr.type == onnx.AttributeProto.FLOATS:
+        return [len(attr.floats)]
+    if attr.type == onnx.AttributeProto.STRINGS:
+        return [len(attr.strings)]
+    return None
+
+
+def _get_attribute_value_type(attr: onnx.AttributeProto) -> int:
+    """Return the tensor element type represented by an ONNX attribute value."""
+    if attr.type == onnx.AttributeProto.TENSOR:
+        return attr.t.data_type
+    if attr.type in (onnx.AttributeProto.INT, onnx.AttributeProto.INTS):
+        return TensorProto.INT64
+    if attr.type in (onnx.AttributeProto.FLOAT, onnx.AttributeProto.FLOATS):
+        return TensorProto.FLOAT
+    if attr.type in (onnx.AttributeProto.STRING, onnx.AttributeProto.STRINGS):
+        return TensorProto.STRING
+    return TensorProto.UNDEFINED
+
+
+def _get_attribute_values(attr: onnx.AttributeProto) -> list[Any] | None:
+    """Return flattened tensor-like values from an ONNX attribute."""
+    if attr.type == onnx.AttributeProto.TENSOR:
+        return _get_tensor_values(attr.t)
+    value = _get_attribute_value(attr)
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return list(value)
+    return [value]
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -1674,7 +1964,7 @@ class OsclShapeInferenceEngine:
 
             spec = self._specs[spec_name]
 
-            # Map ONNX node inputs â†’ OTSL spec input names
+            # Map ONNX node inputs -> OTSL spec input names
             input_shapes: dict[str, list[int | None]] = {}
             input_elem_types: dict[str, Any] = {}
             tensor_vals: dict[str, list[int]] = {}
@@ -1703,12 +1993,20 @@ class OsclShapeInferenceEngine:
                         onnx_name = node.input[i]
                         if onnx_name in known_shapes:
                             input_shapes[inp_decl.name] = known_shapes[onnx_name]
+                        elif onnx_name in known_types:
+                            shape = _get_shape_from_type(known_types[onnx_name])
+                            if shape is not None:
+                                input_shapes[inp_decl.name] = shape
                         if onnx_name in known_elem_types:
                             input_elem_types[inp_decl.name] = known_elem_types[onnx_name]
+                        elif onnx_name in known_types:
+                            elem_type = _get_elem_type(known_types[onnx_name])
+                            if elem_type != TensorProto.UNDEFINED:
+                                input_elem_types[inp_decl.name] = elem_type
                         if onnx_name in known_tensor_values:
                             tensor_vals[inp_decl.name] = list(known_tensor_values[onnx_name])
 
-            # Map node attributes â†’ OTSL attribute names
+            # Map node attributes -> OTSL attribute names
             attrs: dict[str, Any] = {}
             # Start with default attribute values
             if node.op_type in _DEFAULT_ATTRS:
@@ -1719,270 +2017,23 @@ class OsclShapeInferenceEngine:
             for attr_name in spec.attributes:
                 if attr_name in node_attr_map:
                     attrs[attr_name] = _get_attribute_value(node_attr_map[attr_name])
-
-            # Special case: Constant â€“ output shape from attribute value
-            if node.op_type == "Constant":
-                shape, et = self._handle_constant(node, node_attr_map)
-                tensor_values = _get_constant_values(node_attr_map)
-                if shape is not None:
-                    for onnx_out in node.output:
-                        if onnx_out:
-                            known_shapes[onnx_out] = shape
-                            known_elem_types[onnx_out] = et
-                            if tensor_values is not None:
-                                known_tensor_values[onnx_out] = list(tensor_values)
-                            tp = _make_type_proto(shape, et)
-                            known_types[onnx_out] = copy.deepcopy(tp)
-                            if onnx_out not in value_info_names:
-                                vi = graph.value_info.add()
-                                vi.name = onnx_out
-                                vi.type.CopyFrom(tp)
-                                value_info_names.add(onnx_out)
-                    continue
-
-
-            # Special case: ConstantOfShape — output type from value attribute
-            # Special case: Reduction operators (opset <18 used axes as
-            # attribute; opset >= 18 uses axes as second input).
-            _REDUCE_OPS = {
-                "ReduceMax", "ReduceMean", "ReduceMin", "ReduceProd",
-                "ReduceSum", "ReduceLogSum", "ReduceLogSumExp",
-                "ReduceL1", "ReduceL2", "ReduceSumSquare",
-            }
-            if node.op_type in _REDUCE_OPS:
-                # If 'axes' attribute exists (opset < 18), inject as tensor value
-                if "axes" in node_attr_map:
-                    axes_val = _get_attribute_value(node_attr_map["axes"])
-                    if axes_val is not None:
-                        tensor_vals["axes"] = list(axes_val)
-                # If noop_with_empty_axes and no axes provided, skip
-                noop = attrs.get("noop_with_empty_axes", 0)
-                has_empty_axes = "axes" not in tensor_vals
-                if not has_empty_axes and tensor_vals.get("axes") == []:
-                    has_empty_axes = True
-                if len(node.input) >= 2 and node.input[1]:
-                    axes_name = node.input[1]
-                    if axes_name in known_tensor_values and known_tensor_values[axes_name] == []:
-                        has_empty_axes = True
-                if noop and has_empty_axes:
-                    # No axes â†’ no-op (output = input shape)
-                    first_in = node.input[0] if node.input else ""
-                    if first_in in known_shapes:
-                        for onnx_out in node.output:
-                            if onnx_out:
-                                known_shapes[onnx_out] = known_shapes[first_in]
-                                et = known_elem_types.get(first_in, TensorProto.FLOAT)
-                                known_elem_types[onnx_out] = et
-                                tp = _make_type_proto(known_shapes[first_in], et)
-                                known_types[onnx_out] = copy.deepcopy(tp)
-                                if onnx_out not in value_info_names:
-                                    vi = graph.value_info.add()
-                                    vi.name = onnx_out
-                                    vi.type.CopyFrom(tp)
-                                    value_info_names.add(onnx_out)
-                        continue
-                # If no axes input/attribute, reduce all dims
-                if "axes" not in tensor_vals and (len(node.input) < 2 or not node.input[1]):
-                    first_in = node.input[0] if node.input else ""
-                    if first_in in known_shapes:
-                        rank = len(known_shapes[first_in])
-                        tensor_vals["axes"] = list(range(rank))
-
-            # Special case: Split â€“ compute shapes for all outputs
-            if node.op_type == "Split":
-                split_shapes = self._handle_split(
-                    node, spec, input_shapes, attrs,
-                    tensor_vals, node_attr_map, known_shapes
-                )
-                if split_shapes is not None:
-                    for onnx_out, shape in split_shapes.items():
-                        known_shapes[onnx_out] = shape
-                        et = TensorProto.FLOAT
-                        if node.input:
-                            et = known_elem_types.get(node.input[0], TensorProto.FLOAT)
-                        known_elem_types[onnx_out] = et
-                        tp = _make_type_proto(shape, et)
-                        known_types[onnx_out] = copy.deepcopy(tp)
-                        if onnx_out not in value_info_names:
-                            vi = graph.value_info.add()
-                            vi.name = onnx_out
-                            vi.type.CopyFrom(tp)
-                            value_info_names.add(onnx_out)
-                    continue
-
-            # Special case: Slice â€“ handle optional inputs
-            if node.op_type == "Slice":
-                first_in = node.input[0] if node.input else ""
-                if first_in in known_shapes:
-                    in_shape = known_shapes[first_in]
-                    rank = len(in_shape)
-                    # axes defaults to all axes, steps defaults to 1
-                    if "axes" not in tensor_vals and (len(node.input) < 4 or not node.input[3]):
-                        tensor_vals["axes"] = list(range(rank))
-                    if "steps" not in tensor_vals and (len(node.input) < 5 or not node.input[4]):
-                        n_axes = len(tensor_vals.get("starts", []))
-                        tensor_vals["steps"] = [1] * n_axes
-
-            # Removed legacy Size special case; kept as an empty block to avoid churn here.
-            if False:
-                pass
-
-            # Special case: Pad operator â€“ handle optional axes input
-            if node.op_type == "Pad":
-                if len(node.input) >= 4 and node.input[3]:
-                    axes_name = node.input[3]
-                    if axes_name in known_tensor_values:
-                        tensor_vals["axes"] = list(known_tensor_values[axes_name])
-                if "axes" not in tensor_vals:
-                    tensor_vals["axes"] = []
-
-            # Special case: Optional operators need full type propagation.
-            if node.op_type == "OptionalGetElement" and node.input and node.output:
-                input_name = node.input[0]
-                output_name = node.output[0]
-                input_tp = known_types.get(input_name)
-                if input_tp is not None:
-                    if input_tp.HasField("optional_type"):
-                        output_tp = copy.deepcopy(input_tp.optional_type.elem_type)
-                    else:
-                        output_tp = copy.deepcopy(input_tp)
-                    known_types[output_name] = copy.deepcopy(output_tp)
-                    shape = _get_shape_from_type(output_tp)
-                    if shape is not None:
-                        known_shapes[output_name] = shape
-                    elem_type = _get_elem_type(output_tp)
-                    if elem_type != TensorProto.UNDEFINED:
-                        known_elem_types[output_name] = elem_type
-                    if output_name not in value_info_names:
-                        vi = graph.value_info.add()
-                        vi.name = output_name
-                        vi.type.CopyFrom(output_tp)
-                        value_info_names.add(output_name)
-                    continue
-
-            if node.op_type == "OptionalHasElement" and node.output:
-                output_name = node.output[0]
-                output_tp = _make_type_proto([], TensorProto.BOOL)
-                known_types[output_name] = copy.deepcopy(output_tp)
-                known_shapes[output_name] = []
-                known_elem_types[output_name] = TensorProto.BOOL
-                if output_name not in value_info_names:
-                    vi = graph.value_info.add()
-                    vi.name = output_name
-                    vi.type.CopyFrom(output_tp)
-                    value_info_names.add(output_name)
-                continue
-
-            if node.op_type == "SplitToSequence" and node.input and node.output:
-                input_name = node.input[0]
-                if input_name in known_shapes:
-                    axis = _get_attribute_value(node_attr_map["axis"]) if "axis" in node_attr_map else 0
-                    keepdims = (
-                        _get_attribute_value(node_attr_map["keepdims"])
-                        if "keepdims" in node_attr_map
-                        else 1
-                    )
-                    input_shape = list(known_shapes[input_name])
-                    rank = len(input_shape)
-                    if axis < 0:
-                        axis += rank
-                    elem_shape = list(input_shape)
-                    split_name = node.input[1] if len(node.input) >= 2 else ""
-                    split_values = known_tensor_values.get(split_name, [])
-                    if keepdims:
-                        if len(split_values) == 1:
-                            elem_shape[axis] = int(split_values[0])
-                        elif not split_values:
-                            elem_shape[axis] = 1
-                        else:
-                            elem_shape[axis] = None
-                    else:
-                        elem_shape.pop(axis)
-                    output_name = node.output[0]
-                    et = known_elem_types.get(input_name, TensorProto.FLOAT)
-                    output_tp = _make_sequence_type_proto(elem_shape, et)
-                    known_types[output_name] = copy.deepcopy(output_tp)
-                    if output_name not in value_info_names:
-                        vi = graph.value_info.add()
-                        vi.name = output_name
-                        vi.type.CopyFrom(output_tp)
-                        value_info_names.add(output_name)
-                    continue
-
-            if node.op_type == "If" and node.output:
-                then_branch = node_attr_map.get("then_branch")
-                else_branch = node_attr_map.get("else_branch")
-                if then_branch is not None and else_branch is not None:
-                    for index, output_name in enumerate(node.output):
-                        if not output_name:
-                            continue
-                        then_tp = then_branch.g.output[index].type
-                        else_tp = else_branch.g.output[index].type
-                        output_tp = _merge_type_protos(then_tp, else_tp)
-                        known_types[output_name] = copy.deepcopy(output_tp)
-                        shape = _get_shape_from_type(output_tp)
-                        if shape is not None:
-                            known_shapes[output_name] = shape
-                        elem_type = _get_elem_type(output_tp)
-                        if elem_type != TensorProto.UNDEFINED:
-                            known_elem_types[output_name] = elem_type
-                        if output_name not in value_info_names:
-                            vi = graph.value_info.add()
-                            vi.name = output_name
-                            vi.type.CopyFrom(output_tp)
-                            value_info_names.add(output_name)
-                    continue
-
-            if node.op_type == "Loop" and node.output:
-                body_attr = node_attr_map.get("body")
-                if body_attr is not None:
-                    for index, output_name in enumerate(node.output):
-                        if not output_name:
-                            continue
-                        body_index = index + 1
-                        if body_index >= len(body_attr.g.output):
-                            continue
-                        output_tp = copy.deepcopy(body_attr.g.output[body_index].type)
-                        if (
-                            output_tp.HasField("sequence_type")
-                            and output_tp.sequence_type.elem_type.HasField("tensor_type")
-                            and not output_tp.sequence_type.elem_type.tensor_type.HasField("shape")
-                            and len(node.input) > index + 2
-                            and node.input[index + 2] in known_types
-                        ):
-                            carried_tp = known_types[node.input[index + 2]]
-                            if carried_tp.HasField("sequence_type"):
-                                output_tp = copy.deepcopy(carried_tp)
-                        if (
-                            len(node.input) > index + 2
-                            and node.input[index + 2] in known_types
-                            and known_types[node.input[index + 2]].HasField("optional_type")
-                            and output_name in known_types
-                            and known_types[output_name].HasField("sequence_type")
-                            and known_types[output_name].sequence_type.elem_type.HasField("tensor_type")
-                            and not known_types[output_name].sequence_type.elem_type.tensor_type.HasField("shape")
-                        ):
-                            output_tp = copy.deepcopy(known_types[output_name])
-                        known_types[output_name] = copy.deepcopy(output_tp)
-                        shape = _get_shape_from_type(output_tp)
-                        if shape is not None:
-                            known_shapes[output_name] = shape
-                        elem_type = _get_elem_type(output_tp)
-                        if elem_type != TensorProto.UNDEFINED:
-                            known_elem_types[output_name] = elem_type
-                        if output_name not in value_info_names:
-                            vi = graph.value_info.add()
-                            vi.name = output_name
-                            vi.type.CopyFrom(output_tp)
-                            value_info_names.add(output_name)
-                    continue
-
             # Execute the spec --------------------------------------------------
             try:
-                output_shapes, output_types, output_values = _execute_spec(
+                node_input_types = [
+                    copy.deepcopy(known_types[name]) if name in known_types else None
+                    for name in node.input
+                ]
+                node_output_types = [
+                    copy.deepcopy(known_types[name]) if name in known_types else None
+                    for name in node.output
+                ]
+                output_shapes, output_types, output_values, output_onnx_types = _execute_spec(
                     spec, input_shapes, attrs, tensor_vals,
                     elem_types=input_elem_types,
                     attribute_protos=node_attr_map,
+                    full_types=known_types,
+                    node_input_types=node_input_types,
+                    node_output_types=node_output_types,
                 )
             except (
                 ConstraintViolation,
@@ -1997,9 +2048,78 @@ class OsclShapeInferenceEngine:
                 continue  # graceful degradation for unsupported edge cases
 
             # Store results back ------------------------------------------------
+            if len(spec.outputs) == 1:
+                out_name = spec.outputs[0]
+                inferred_onnx_many = output_onnx_types.get(out_name)
+                if (
+                    isinstance(inferred_onnx_many, list)
+                    and inferred_onnx_many
+                    and all(isinstance(tp, TypeProto) for tp in inferred_onnx_many)
+                ):
+                    for onnx_out, output_tp in zip(node.output, inferred_onnx_many):
+                        if not onnx_out:
+                            continue
+                        tp = copy.deepcopy(output_tp)
+                        known_types[onnx_out] = copy.deepcopy(tp)
+                        shape = _get_shape_from_type(tp)
+                        if shape is not None:
+                            known_shapes[onnx_out] = shape
+                        elem_type = _get_elem_type(tp)
+                        if elem_type != TensorProto.UNDEFINED:
+                            known_elem_types[onnx_out] = elem_type
+                        if onnx_out not in value_info_names:
+                            vi = graph.value_info.add()
+                            vi.name = onnx_out
+                            vi.type.CopyFrom(tp)
+                            value_info_names.add(onnx_out)
+                    continue
+
+            if len(spec.outputs) == 1:
+                out_name = spec.outputs[0]
+                inferred_many = output_shapes.get(out_name)
+                if (
+                    isinstance(inferred_many, list)
+                    and inferred_many
+                    and all(isinstance(shape, (list, tuple)) for shape in inferred_many)
+                ):
+                    et = output_types.get(out_name, TensorProto.UNDEFINED)
+                    if et == TensorProto.UNDEFINED and node.input:
+                        et = known_elem_types.get(
+                            node.input[0], TensorProto.UNDEFINED
+                        )
+                    for onnx_out, inferred in zip(node.output, inferred_many):
+                        if not onnx_out:
+                            continue
+                        shape = _to_shape(inferred)
+                        known_shapes[onnx_out] = shape
+                        known_elem_types[onnx_out] = et
+                        tp = _make_type_proto(shape, et)
+                        known_types[onnx_out] = copy.deepcopy(tp)
+                        if onnx_out not in value_info_names:
+                            vi = graph.value_info.add()
+                            vi.name = onnx_out
+                            vi.type.CopyFrom(tp)
+                            value_info_names.add(onnx_out)
+                    continue
+
             for j, out_name in enumerate(spec.outputs):
                 if j < len(node.output) and node.output[j]:
                     onnx_out = node.output[j]
+                    if out_name in output_onnx_types:
+                        output_tp = copy.deepcopy(output_onnx_types[out_name])
+                        known_types[onnx_out] = copy.deepcopy(output_tp)
+                        shape = _get_shape_from_type(output_tp)
+                        if shape is not None:
+                            known_shapes[onnx_out] = shape
+                        elem_type = _get_elem_type(output_tp)
+                        if elem_type != TensorProto.UNDEFINED:
+                            known_elem_types[onnx_out] = elem_type
+                        if onnx_out not in value_info_names:
+                            vi = graph.value_info.add()
+                            vi.name = onnx_out
+                            vi.type.CopyFrom(output_tp)
+                            value_info_names.add(onnx_out)
+
                     inferred = output_shapes.get(out_name)
                     if inferred is not None:
                         known_shapes[onnx_out] = inferred
