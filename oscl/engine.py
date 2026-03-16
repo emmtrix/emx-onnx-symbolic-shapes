@@ -124,7 +124,7 @@ def _builtin_concat_shape(args: list[Any]) -> list[int | None]:
     """Compute ONNX Concat output shape from a variadic input family and axis."""
     inputs, axis = args
     if not inputs:
-        raise ValueError("concat_shape: empty input family")
+        raise ValueError("concat_shape requires at least one input")
     first = _to_shape(inputs[0])
     r = len(first)
     if axis < 0:
@@ -1031,7 +1031,9 @@ def _execute_spec(
             if stmt.field == "shape":
                 val = _eval_expr(stmt.expr, env)
                 results[stmt.target] = _to_shape(val)
-            # .type results are currently handled by the engine separately
+            # .type results are not evaluated here; element type
+            # propagation is handled separately in _infer_shapes()
+            # (see the "Determine element type" section).
 
     return results
 
