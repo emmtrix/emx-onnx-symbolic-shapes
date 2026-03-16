@@ -1,4 +1,4 @@
-# RFC: Declarative Shape Rules for ONNX (OSCL)
+# RFC: Declarative Type and Shape Rules for ONNX (OSCL)
 
 ## Status
 
@@ -10,23 +10,24 @@ TBD
 
 ## Abstract
 
-This document proposes a declarative domain-specific language (DSL) for specifying shape inference rules for ONNX operators. The language, called **ONNX Shape Constraint Language (OSCL)**, allows operator schemas to define input/output shape relationships using symbolic expressions and constraints.
+This document proposes a declarative domain-specific language (DSL) for specifying type and shape inference rules for ONNX operators. The language, called **ONNX Shape Constraint Language (OSCL)**, allows operator schemas to define input/output type and shape relationships using symbolic expressions and constraints.
 
-The goal is to replace or complement existing imperative shape inference implementations with a machine-readable, declarative specification that:
+The goal is to replace or complement existing imperative type and shape inference implementations with a machine-readable, declarative specification that:
 
 - is deterministic
 - supports symbolic dimensions
-- supports partial shape inference
+- supports tensor element type propagation
+- supports partial inference
 - is suitable for static analysis
 - can be validated automatically
 
-OSCL is intended to become a normative representation of operator shape semantics while remaining compatible with existing ONNX models and runtimes.
+OSCL remains the human-readable specification language, while the canonical representation is an AST embedded in the ONNX C++ `OpSchema` definition. OSCL is intended to become a normative representation of operator type and shape semantics while remaining compatible with existing ONNX models and runtimes.
 
 ---
 
 ## 1 Motivation
 
-Shape inference in ONNX is currently implemented as imperative functions attached to operator schemas (`TypeAndShapeInferenceFunction`). These implementations:
+Type and shape inference in ONNX is currently implemented as imperative functions attached to operator schemas (`TypeAndShapeInferenceFunction`) together with auxiliary helpers such as `propagateShapeFromInputToOutput` and `propagateElemTypeFromInputToOutput`. These implementations:
 
 - are written in C++
 - are not machine-readable specifications
@@ -34,11 +35,12 @@ Shape inference in ONNX is currently implemented as imperative functions attache
 - vary across implementations
 - are difficult to test formally
 
-A declarative specification of shape rules enables:
+A declarative specification of type and shape rules enables:
 
 - consistent implementations across runtimes
 - automatic validation of operator definitions
 - symbolic shape reasoning
+- explicit element type propagation
 - improved tooling (compilers, optimizers, converters)
 - formal reasoning about graph transformations
 
@@ -51,12 +53,13 @@ OSCL provides a compact and expressive language for describing these rules.
 The proposed DSL must support:
 
 1. symbolic dimension propagation
-2. constraints between dimensions
-3. broadcast semantics
-4. partial inference
-5. shape tensor evaluation
-6. rank reasoning
-7. operator attributes influencing shapes
+2. tensor element type propagation
+3. constraints between dimensions and types
+4. broadcast semantics
+5. partial inference
+6. shape tensor evaluation
+7. rank reasoning
+8. operator attributes influencing types and shapes
 
 The DSL must remain:
 
@@ -84,6 +87,7 @@ OSCL does not attempt to:
 | Rank        | number of tensor dimensions                          |
 | Dim         | single tensor dimension                              |
 | Shape       | ordered list of dimensions                           |
+| Type        | tensor element type                                  |
 | ShapeTensor | tensor whose runtime values represent shapes         |
 
 ---
@@ -128,14 +132,39 @@ Example:
 [dim(A,0), dim(B,1)]
 ```
 
+### Type
+
+Tensor element type.
+
+Examples:
+
+```
+float
+double
+int64
+type(A)
+```
+
+Type expressions may be compared in constraints and used in result assignments.
+
+Examples:
+
+```
+type(X)
+type(X) == type(Y)
+type(X) in {float, double}
+```
+
 ### Bool
 
 Constraint expressions.
 
-Example:
+Examples:
 
 ```
 dim(A,0) == dim(B,0)
+type(X) == type(Y)
+type(X) in {float, double}
 ```
 
 ### ShapeTensor
@@ -152,12 +181,12 @@ shape_value(shape)
 
 ## 6 Core Syntax
 
-A shape specification is embedded inside an operator definition.
+A type and shape rule specification is embedded inside an operator definition.
 
 Example:
 
 ```
-shape {
+rules {
   inputs  A, B;
   outputs Y;
 
@@ -165,10 +194,12 @@ shape {
   require rank(B) >= 2;
 
   require dim(A,-1) == dim(B,-2);
+  require type(A) == type(B);
 
   let batch = broadcast(prefix(A,-2), prefix(B,-2));
 
-  result Y = concat(batch, [dim(A,-2), dim(B,-1)]);
+  result Y.shape = concat(batch, [dim(A,-2), dim(B,-1)]);
+  result Y.type  = type(A);
 }
 ```
 
@@ -180,8 +211,12 @@ shape {
 
 Declares a constraint that must hold.
 
+Examples:
+
 ```
 require dim(A,1) == dim(B,0);
+require type(X) == type(Y);
+require type(X) in {float, double};
 ```
 
 Violation indicates an invalid graph.
@@ -200,10 +235,11 @@ let m = dim(A,-2);
 
 ### `result`
 
-Defines the shape of an output tensor.
+Defines the shape and/or type of an output tensor.
 
 ```
-result Y = [dim(A,0), dim(B,1)];
+result Y.shape = [dim(A,0), dim(B,1)];
+result Y.type  = type(A);
 ```
 
 ---
@@ -214,7 +250,8 @@ Defines conditional rules.
 
 ```
 when rank(A) == 1 and rank(B) == 1 {
-  result Y = [];
+  result Y.shape = [];
+  result Y.type  = type(A);
 }
 ```
 
@@ -323,16 +360,16 @@ Shape tensor evaluation is restricted to inputs explicitly defined as shape tens
 
 ## 11 Partial Inference
 
-OSCL supports incomplete knowledge.
+OSCL supports incomplete knowledge for both types and shapes.
 
 Possible dimension states:
 
-| State            | Example  |
-|------------------|----------|
-| known constant   | `32`     |
+| State            | Example    |
+|------------------|------------|
+| known constant   | `32`       |
 | symbolic         | `sym("N")` |
-| expression       | `N + 5`  |
-| unknown          | `?`      |
+| expression       | `N + 5`    |
+| unknown          | `?`        |
 
 Constraints may propagate relationships even if values are unknown.
 
@@ -341,6 +378,8 @@ Example:
 ```
 require dim(A,0) == dim(B,0)
 ```
+
+Type inference may likewise remain unresolved when the rule block does not determine a unique element type.
 
 ---
 
@@ -352,7 +391,7 @@ same_shape(A,B)
 known(d)
 ```
 
-These predicates allow safe reasoning when dimensions are partially known.
+These predicates allow safe reasoning when dimensions are partially known. Type comparisons use standard equality and set-membership expressions.
 
 ---
 
@@ -363,11 +402,12 @@ Some operators produce shapes depending on runtime data.
 Example: `NonZero`.
 
 ```
-shape {
+rules {
   inputs X;
   outputs Y;
 
-  result Y = [rank(X), unknown_nonnegative()];
+  result Y.shape = [rank(X), unknown_nonnegative()];
+  result Y.type  = int64;
 }
 ```
 
@@ -380,15 +420,17 @@ This provides a safe upper bound without evaluating tensor contents.
 ### MatMul
 
 ```
-shape {
+rules {
   inputs A, B;
   outputs Y;
 
   require dim(A,-1) == dim(B,-2);
+  require type(A) == type(B);
 
   let batch = broadcast(prefix(A,-2), prefix(B,-2));
 
-  result Y = concat(batch, [dim(A,-2), dim(B,-1)]);
+  result Y.shape = concat(batch, [dim(A,-2), dim(B,-1)]);
+  result Y.type  = type(A);
 }
 ```
 
@@ -397,33 +439,38 @@ shape {
 ### Concat
 
 ```
-shape {
+rules {
   inputs Xs[];
   outputs Y;
   attributes axis;
 
   let ax = normalize_axis(axis, rank(Xs[0]));
 
-  result Y =
+  result Y.shape =
     map j in range(rank(Xs[0])):
       if j == ax
         then sum(map i in Xs: dim(i,j))
         else dim(Xs[0],j);
+
+  result Y.type = type(Xs[0]);
 }
 ```
+
+The result type follows the variadic input family. Any additional homogeneous-type requirements may be enforced by the surrounding operator schema or explicit `require` constraints.
 
 ---
 
 ### Reshape
 
 ```
-shape {
+rules {
   inputs data, shape;
   outputs reshaped;
 
   let target = shape_value(shape);
 
-  result reshaped = resolve_reshape(shape(data), target);
+  result reshaped.shape = resolve_reshape(shape(data), target);
+  result reshaped.type  = type(data);
 }
 ```
 
@@ -433,24 +480,32 @@ shape {
 
 ## 15 Canonical Representation
 
-Although the DSL may appear in human-readable form, the normative representation should be a structured AST format.
+Although the DSL may appear in human-readable form, the normative representation is a structured AST that includes both type and shape assignments.
 
 Example (simplified JSON):
 
 ```json
 {
-  "inputs": ["A","B"],
-  "outputs": ["Y"],
-  "statements": [
+  "statements":[
     {
-      "kind": "require",
-      "expr": {
-        "op": "eq",
-        "args": [
-          {"op": "dim", "args": ["A", -1]},
-          {"op": "dim", "args": ["B", -2]}
+      "kind":"require",
+      "expr":{
+        "op":"eq",
+        "args":[
+          {"op":"type","tensor":"X"},
+          {"op":"type","tensor":"slope"}
         ]
       }
+    },
+    {
+      "kind":"result_shape",
+      "tensor":"Y",
+      "expr":{"op":"shape_of","tensor":"X"}
+    },
+    {
+      "kind":"result_type",
+      "tensor":"Y",
+      "expr":{"op":"type_of","tensor":"X"}
     }
   ]
 }
@@ -458,17 +513,48 @@ Example (simplified JSON):
 
 The textual syntax is considered a presentation format.
 
+### C++ Shape and Type Rule Representation
+
+OSCL text is only a presentation format. The canonical representation used by ONNX schemas is an AST embedded directly in the C++ `OpSchema` definition.
+
+Example:
+
+```cpp
+OpSchema()
+  .SetTypeAndShapeRules(
+      Require(
+          Broadcastable(
+              ShapeOf("slope"),
+              ShapeOf("X")
+          )
+      ),
+      Require(
+          TypeEq("X", "slope")
+      ),
+      ResultShape(
+          "Y",
+          ShapeOf("X")
+      ),
+      ResultType(
+          "Y",
+          TypeOf("X")
+      )
+  );
+```
+
+The OSCL textual syntax maps directly to this AST and remains the human-readable way to author and review rule blocks.
+
 ---
 
 ## 16 Error Semantics
 
-Evaluation of shape rules may produce:
+Evaluation of type and shape rules may produce:
 
 | Status   | Meaning                         |
 |----------|---------------------------------|
-| exact    | shape fully known               |
+| exact    | type and shape fully known      |
 | symbolic | symbolic expressions present    |
-| partial  | incomplete dimensions           |
+| partial  | incomplete dimensions or types  |
 | unknown  | inference not possible          |
 | invalid  | constraints violated            |
 
@@ -476,14 +562,16 @@ Evaluation of shape rules may produce:
 
 ## 17 Integration with ONNX
 
-Each `OpSchema` may optionally include a shape specification.
+Each `OpSchema` may optionally include a type and shape rule specification.
+
+The canonical representation is a C++ AST attached to the schema. The OSCL textual syntax maps directly to this AST and may be used for authoring, review, interchange, or generated documentation. Runtimes may ignore these rules if unsupported.
 
 Example:
 
 ```cpp
 OpSchema()
   .SetName("MatMul")
-  .SetShapeRules(OSCL_definition)
+  .SetTypeAndShapeRules(...)
 ```
 
 Existing imperative inference functions may remain for backward compatibility.
@@ -495,7 +583,7 @@ Existing imperative inference functions may remain for backward compatibility.
 A prototype implementation should:
 
 - parse OSCL definitions
-- propagate symbolic shapes through graphs
+- propagate symbolic shapes and element types through graphs
 - validate constraints
 - support partial inference
 - be deterministic
@@ -518,7 +606,7 @@ Runtimes may:
 
 - ignore OSCL rules
 - use them for validation
-- use them for shape inference
+- use them for type and shape inference
 
 ---
 
@@ -535,6 +623,6 @@ Possible extensions include:
 
 ## 21 Conclusion
 
-OSCL introduces a declarative, machine-readable way to describe ONNX operator shape semantics.
+OSCL introduces a declarative, machine-readable way to describe ONNX operator type and shape semantics.
 
 This approach improves portability, tooling support, and formal verification while remaining compatible with existing ONNX infrastructure.
