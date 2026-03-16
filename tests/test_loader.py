@@ -1,7 +1,7 @@
 """Tests for the OTSL spec loader."""
 
-from oscl.ast import ShapeSpec
-from oscl.loader import load_all_specs, load_spec
+from otsl.ast import ShapeSpec
+from otsl.loader import load_all_specs, load_spec
 import pytest
 
 

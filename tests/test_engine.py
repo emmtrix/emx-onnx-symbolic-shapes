@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from onnx import ModelProto, TensorProto, helper, numpy_helper
 
-from oscl.engine import infer_shapes as oscl_infer_shapes
+from otsl.engine import infer_shapes as otsl_infer_shapes
 from tests.official_engine_suite import (
     EXPECTED_RESULTS_PATH,
     collect_official_test_cases,
@@ -54,7 +54,7 @@ def test_expected_results_cover_all_official_cases() -> None:
 
 
 @pytest.mark.parametrize("case, expected_result", _TEST_PARAMS)
-def test_oscl_vs_onnx(case: Any, expected_result: str) -> None:
+def test_otsl_vs_onnx(case: Any, expected_result: str) -> None:
     actual_result = compare_case(case)
     assert actual_result == expected_result
 
@@ -108,66 +108,66 @@ class TestEngineBasic:
 
     def test_add(self) -> None:
         m = self._simple_model("Add", [[3, 4, 5], [3, 4, 5]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4, 5]}
 
     def test_add_broadcast(self) -> None:
         m = self._simple_model("Add", [[3, 4, 5], [5]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4, 5]}
 
     def test_relu(self) -> None:
         m = self._simple_model("Relu", [[2, 3, 4]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [2, 3, 4]}
 
     def test_split_without_num_outputs_uses_node_output_count(self) -> None:
         m = self._simple_model("Split", [[2, 4]], output_names=["left", "right"], attrs={"axis": 1})
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"left": [2, 2], "right": [2, 2]}
 
     def test_matmul_2d(self) -> None:
         m = self._simple_model("MatMul", [[3, 4], [4, 5]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 5]}
 
     def test_matmul_4d_broadcast(self) -> None:
         m = self._simple_model("MatMul", [[3, 1, 3, 4], [1, 2, 4, 2]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 2, 3, 2]}
 
     def test_transpose_default_perm(self) -> None:
         m = self._simple_model("Transpose", [[2, 3, 4]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [4, 3, 2]}
 
     def test_transpose_explicit_perm(self) -> None:
         m = self._simple_model(
             "Transpose", [[2, 3, 4]], attrs={"perm": [1, 2, 0]}
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4, 2]}
 
     def test_flatten_default(self) -> None:
         m = self._simple_model("Flatten", [[5, 4, 3, 2]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [5, 24]}
 
     def test_flatten_axis0(self) -> None:
         m = self._simple_model("Flatten", [[2, 3, 4, 5]], attrs={"axis": 0})
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [1, 120]}
 
     def test_gemm_no_trans(self) -> None:
         m = self._simple_model("Gemm", [[3, 5], [5, 4], [1, 4]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4]}
 
     def test_gemm_transA(self) -> None:
         m = self._simple_model(
             "Gemm", [[6, 3], [6, 4], [1, 4]], attrs={"transA": 1}
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4]}
 
     def test_reshape(self) -> None:
@@ -177,7 +177,7 @@ class TestEngineBasic:
             [[2, 3, 4], [2]],
             initializers=[("input_1", target)],
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [6, 4]}
 
     def test_reshape_neg1(self) -> None:
@@ -187,19 +187,19 @@ class TestEngineBasic:
             [[2, 3, 4], [2]],
             initializers=[("input_1", target)],
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [2, 12]}
 
     def test_softmax(self) -> None:
         m = self._simple_model("Softmax", [[1, 3]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [1, 3]}
 
     def test_gather(self) -> None:
         m = self._simple_model(
             "Gather", [[5, 4, 3, 2], [3]], attrs={"axis": 0}
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4, 3, 2]}
 
     def test_squeeze(self) -> None:
@@ -209,7 +209,7 @@ class TestEngineBasic:
             [[1, 3, 4, 5], [1]],
             initializers=[("input_1", axes)],
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [3, 4, 5]}
 
     def test_unsqueeze(self) -> None:
@@ -219,25 +219,25 @@ class TestEngineBasic:
             [[3, 4, 5], [1]],
             initializers=[("input_1", axes)],
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [1, 3, 4, 5]}
 
     def test_nonzero_rank(self) -> None:
         """NonZero: first dim = rank(X), second dim is unknown."""
         m = self._simple_model("NonZero", [[2, 2]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         shapes = get_output_shapes(result)
         assert shapes["output"][0] == 2
 
     def test_concat(self) -> None:
         m = self._simple_model("Concat", [[2, 3], [2, 4]], attrs={"axis": 1})
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [2, 7]}
 
     def test_interface_matches_onnx(self) -> None:
         """Verify the return type is ModelProto like ``onnx.shape_inference``."""
         m = self._simple_model("Relu", [[2, 3]])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert isinstance(result, ModelProto)
 
     def test_missing_spec_raises(self) -> None:
@@ -250,7 +250,7 @@ class TestEngineBasic:
         with pytest.raises(
             NotImplementedError, match="MissingSpecOp"
         ):
-            oscl_infer_shapes(m)
+            otsl_infer_shapes(m)
 
     @staticmethod
     def _typed_model(
@@ -293,7 +293,7 @@ class TestEngineBasic:
     def test_type_passthrough(self) -> None:
         """Unary op preserves input type."""
         m = self._typed_model("Relu", [([2, 3], TensorProto.DOUBLE)])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.DOUBLE}
 
     def test_type_broadcast(self) -> None:
@@ -302,7 +302,7 @@ class TestEngineBasic:
             ([3, 4], TensorProto.FLOAT16),
             ([3, 4], TensorProto.FLOAT16),
         ])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.FLOAT16}
 
     def test_type_comparison_bool(self) -> None:
@@ -311,13 +311,13 @@ class TestEngineBasic:
             ([3, 4], TensorProto.INT64),
             ([3, 4], TensorProto.INT64),
         ])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.BOOL}
 
     def test_type_argmax_int64(self) -> None:
         """ArgMax produces int64."""
         m = self._typed_model("ArgMax", [([3, 4], TensorProto.FLOAT)])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.INT64}
 
     def test_type_cast(self) -> None:
@@ -327,19 +327,19 @@ class TestEngineBasic:
             [([2, 3], TensorProto.FLOAT)],
             attrs={"to": TensorProto.INT64},
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.INT64}
 
     def test_type_shape_int64(self) -> None:
         """Shape op always returns int64."""
         m = self._typed_model("Shape", [([2, 3, 4], TensorProto.FLOAT)])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.INT64}
 
     def test_type_nonzero_int64(self) -> None:
         """NonZero always returns int64."""
         m = self._typed_model("NonZero", [([2, 2], TensorProto.DOUBLE)])
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.INT64}
 
     def test_type_concat_passthrough(self) -> None:
@@ -349,5 +349,5 @@ class TestEngineBasic:
             [([2, 3], TensorProto.DOUBLE), ([2, 4], TensorProto.DOUBLE)],
             attrs={"axis": 1},
         )
-        result = oscl_infer_shapes(m)
+        result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.DOUBLE}

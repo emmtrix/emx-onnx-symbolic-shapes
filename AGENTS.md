@@ -54,7 +54,7 @@ All implementation decisions must be grounded in the RFC. When the RFC is ambigu
 ## Suggested Implementation Structure
 
 ```
-oscl/
+otsl/
   parser/       # textual DSL -> AST
   ast/          # AST node definitions
   evaluator/    # symbolic shape propagation

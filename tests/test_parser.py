@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from oscl.ast import (
+from otsl.ast import (
     BinOp,
     FuncCall,
     Identifier,
@@ -20,7 +20,7 @@ from oscl.ast import (
     StringLit,
     UnknownDim,
 )
-from oscl.parser import ParseError, parse
+from otsl.parser import ParseError, parse
 
 
 # ---------------------------------------------------------------
@@ -238,12 +238,12 @@ class TestRFCExamples:
 # All shipped spec files parse successfully
 # ---------------------------------------------------------------
 
-_SPECS_DIR = Path(__file__).resolve().parent.parent / "oscl" / "specs"
+_SPECS_DIR = Path(__file__).resolve().parent.parent / "otsl" / "specs"
 
 
 @pytest.mark.parametrize(
     "spec_file",
-    sorted(_SPECS_DIR.glob("*.oscl")),
+    sorted(_SPECS_DIR.glob("*.otsl")),
     ids=lambda p: p.stem,
 )
 def test_all_spec_files_parse(spec_file: Path) -> None:

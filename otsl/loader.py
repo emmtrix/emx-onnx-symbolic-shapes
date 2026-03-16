@@ -1,4 +1,4 @@
-"""Utilities for loading ``.oscl`` spec files shipped with the package."""
+"""Utilities for loading ``.otsl`` spec files shipped with the package."""
 
 from __future__ import annotations
 
@@ -19,19 +19,19 @@ def load_spec(name: str) -> ShapeSpec:
 
         spec = load_spec("matmul")
     """
-    path = _SPECS_DIR / f"{name}.oscl"
+    path = _SPECS_DIR / f"{name}.otsl"
     if not path.exists():
         raise FileNotFoundError(f"No spec file found for {name!r} at {path}")
     return parse(path.read_text(encoding="utf-8"))
 
 
 def load_all_specs() -> dict[str, ShapeSpec]:
-    """Load every ``.oscl`` file in the specs directory.
+    """Load every ``.otsl`` file in the specs directory.
 
     Returns a mapping from operator name (stem of the filename) to the
     parsed :class:`ShapeSpec`.
     """
     specs: dict[str, ShapeSpec] = {}
-    for path in sorted(_SPECS_DIR.glob("*.oscl")):
+    for path in sorted(_SPECS_DIR.glob("*.otsl")):
         specs[path.stem] = parse(path.read_text(encoding="utf-8"))
     return specs

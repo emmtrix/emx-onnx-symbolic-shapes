@@ -14,7 +14,7 @@ import onnx
 from onnx import ModelProto, TensorProto, TypeProto, numpy_helper, shape_inference
 from onnx.backend.test.loader import load_model_tests
 
-from oscl.engine import OsclShapeInferenceEngine
+from otsl.engine import OtslShapeInferenceEngine
 
 OFFICIAL_TEST_KINDS = (
     "node",
@@ -43,7 +43,7 @@ class OfficialTestCase:
     url: str | None
 
 
-ENGINE = OsclShapeInferenceEngine()
+ENGINE = OtslShapeInferenceEngine()
 
 
 def collect_official_test_cases() -> list[OfficialTestCase]:
@@ -173,11 +173,11 @@ def compare_case(case: OfficialTestCase) -> str:
         enriched_model = _inject_constant_inputs(model, input_values)
 
         onnx_inferred = shape_inference.infer_shapes(copy.deepcopy(enriched_model))
-        oscl_inferred = ENGINE.infer_shapes(enriched_model)
+        otsl_inferred = ENGINE.infer_shapes(enriched_model)
 
         onnx_outputs = _get_output_signatures(onnx_inferred)
-        oscl_outputs = _get_output_signatures(oscl_inferred)
-        mismatch = _first_output_mismatch(onnx_outputs, oscl_outputs)
+        otsl_outputs = _get_output_signatures(otsl_inferred)
+        mismatch = _first_output_mismatch(onnx_outputs, otsl_outputs)
         if mismatch is not None:
             return mismatch
         return "OK"
@@ -306,21 +306,21 @@ def _inject_constant_inputs(
 
 def _first_output_mismatch(
     onnx_outputs: dict[str, dict[str, Any]],
-    oscl_outputs: dict[str, dict[str, Any]],
+    otsl_outputs: dict[str, dict[str, Any]],
 ) -> str | None:
-    if set(onnx_outputs) != set(oscl_outputs):
+    if set(onnx_outputs) != set(otsl_outputs):
         return (
             "output names differ: "
-            f"OTSL={sorted(oscl_outputs)} ONNX={sorted(onnx_outputs)}"
+            f"OTSL={sorted(otsl_outputs)} ONNX={sorted(onnx_outputs)}"
         )
 
     for out_name in sorted(onnx_outputs):
         onnx_sig = onnx_outputs[out_name]
-        oscl_sig = oscl_outputs[out_name]
-        if oscl_sig != onnx_sig:
+        otsl_sig = otsl_outputs[out_name]
+        if otsl_sig != onnx_sig:
             return (
                 f"output {out_name!r} mismatch: "
-                f"OTSL={json.dumps(oscl_sig, sort_keys=True)} "
+                f"OTSL={json.dumps(otsl_sig, sort_keys=True)} "
                 f"ONNX={json.dumps(onnx_sig, sort_keys=True)}"
             )
     return None

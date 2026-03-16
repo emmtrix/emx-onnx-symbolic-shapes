@@ -33,7 +33,7 @@ from .ast import (
 )
 from .loader import load_all_specs
 
-__all__ = ["infer_shapes", "OsclShapeInferenceEngine"]
+__all__ = ["infer_shapes", "OtslShapeInferenceEngine"]
 
 # Sentinel for unknown dimensions (data-dependent).
 _UNKNOWN = None
@@ -1867,12 +1867,12 @@ def _get_attribute_values(attr: onnx.AttributeProto) -> list[Any] | None:
 # ---------------------------------------------------------------------------
 
 
-class OsclShapeInferenceEngine:
+class OtslShapeInferenceEngine:
     """Shape inference engine backed by OTSL operator specifications.
 
     Usage::
 
-        engine = OsclShapeInferenceEngine()
+        engine = OtslShapeInferenceEngine()
         inferred_model = engine.infer_shapes(model)
     """
 
@@ -2318,5 +2318,5 @@ def infer_shapes(model: ModelProto) -> ModelProto:
     """
     global _DEFAULT_ENGINE
     if _DEFAULT_ENGINE is None:
-        _DEFAULT_ENGINE = OsclShapeInferenceEngine()
+        _DEFAULT_ENGINE = OtslShapeInferenceEngine()
     return _DEFAULT_ENGINE.infer_shapes(model)
