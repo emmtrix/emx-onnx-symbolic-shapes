@@ -6,4 +6,5 @@ rules {
   let axes_vals = shape_value(axes);
 
   result output.shape = pad_shape(shape(data), pad_vals, axes_vals);
+  result output.type = type(data);
 }

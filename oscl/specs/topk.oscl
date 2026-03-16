@@ -8,4 +8,6 @@ rules {
 
   result Values.shape = topk_shape(shape(X), ax, k_val);
   result Indices.shape = topk_shape(shape(X), ax, k_val);
+  result Values.type = type(X);
+  result Indices.type = int64;
 }

@@ -7,4 +7,5 @@ rules {
   let batch = broadcast(prefix(a,-2), prefix(b,-2));
 
   result y.shape = concat(batch, [dim(a,-2), dim(b,-1)]);
+  result y.type = type(y_zero_point);
 }

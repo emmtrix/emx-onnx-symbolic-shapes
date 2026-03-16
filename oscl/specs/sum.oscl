@@ -3,4 +3,5 @@ rules {
   outputs Y;
 
   result Y.shape = shape(Xs[0]);
+  result Y.type = type(Xs[0]);
 }

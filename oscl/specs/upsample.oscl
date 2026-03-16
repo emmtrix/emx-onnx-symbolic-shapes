@@ -5,4 +5,5 @@ rules {
   let sc = shape_value(scales);
 
   result Y.shape = resize_shape(shape(X), sc, []);
+  result Y.type = type(X);
 }

@@ -5,4 +5,5 @@ rules {
   let target = shape_value(shape_input);
 
   result reshaped.shape = resolve_reshape(shape(data), target);
+  result reshaped.type = type(data);
 }

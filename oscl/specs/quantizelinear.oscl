@@ -1,6 +1,8 @@
 rules {
-  inputs x;
+  inputs x, y_scale;
   outputs y;
+  attributes output_dtype;
 
   result y.shape = shape(x);
+  result y.type = output_dtype;
 }

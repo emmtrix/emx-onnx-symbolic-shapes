@@ -7,4 +7,5 @@ rules {
   let d = shape_value(delta);
 
   result output.shape = range_output_shape(s, l, d);
+  result output.type = type(start);
 }

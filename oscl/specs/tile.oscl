@@ -5,4 +5,5 @@ rules {
   let reps = shape_value(repeats);
 
   result output.shape = tile_shape(shape(input), reps);
+  result output.type = type(input);
 }

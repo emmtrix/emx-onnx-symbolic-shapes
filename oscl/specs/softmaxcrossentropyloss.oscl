@@ -5,4 +5,6 @@ rules {
 
   result output.shape = nll_loss_shape(shape(scores), shape(labels), reduction);
   result log_prob.shape = shape(scores);
+  result output.type = type(scores);
+  result log_prob.type = type(scores);
 }

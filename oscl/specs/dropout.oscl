@@ -4,4 +4,6 @@ rules {
 
   result output.shape = shape(data);
   result mask.shape = shape(data);
+  result output.type = type(data);
+  result mask.type = bool;
 }

@@ -5,4 +5,5 @@ rules {
   let sz = shape_value(size);
 
   result grid.shape = affinegrid_shape(shape(theta), sz);
+  result grid.type = type(theta);
 }

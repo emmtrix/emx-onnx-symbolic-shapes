@@ -4,4 +4,5 @@ rules {
   attributes hidden_size;
 
   result Y.shape = rnn_shape(shape(X), hidden_size, 1);
+  result Y.type = type(X);
 }

@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = shape_value(output_shape_input);
+  result output.type = type(X);
 }

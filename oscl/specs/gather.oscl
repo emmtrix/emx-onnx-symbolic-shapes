@@ -6,4 +6,5 @@ rules {
   let ax = normalize_axis(axis, rank(data));
 
   result output.shape = concat(concat(prefix(data, ax), shape(indices)), suffix(data, ax + 1));
+  result output.type = type(data);
 }

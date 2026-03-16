@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = shape(indices);
+  result output.type = type(data);
 }

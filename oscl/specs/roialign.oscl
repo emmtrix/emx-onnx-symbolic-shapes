@@ -4,4 +4,5 @@ rules {
   attributes output_height, output_width;
 
   result Y.shape = roialign_shape(shape(X), shape(rois), output_height, output_width);
+  result Y.type = type(X);
 }

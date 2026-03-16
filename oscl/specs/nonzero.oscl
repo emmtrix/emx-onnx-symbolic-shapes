@@ -3,4 +3,5 @@ rules {
   outputs Y;
 
   result Y.shape = [rank(X), unknown_nonnegative()];
+  result Y.type = int64;
 }

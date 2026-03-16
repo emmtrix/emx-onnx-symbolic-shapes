@@ -4,4 +4,5 @@ rules {
   attributes equation;
 
   result Y.shape = einsum_shape(Xs, equation);
+  result Y.type = type(Xs[0]);
 }

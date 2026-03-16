@@ -6,4 +6,5 @@ rules {
   let target_axes = shape_value(axes);
 
   result reduced.shape = reduce_shape(shape(data), target_axes, keepdims);
+  result reduced.type = type(data);
 }

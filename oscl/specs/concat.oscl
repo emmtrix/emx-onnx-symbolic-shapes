@@ -4,4 +4,5 @@ rules {
   attributes axis;
 
   result Y.shape = concat_shape(Xs, axis);
+  result Y.type = type(Xs[0]);
 }

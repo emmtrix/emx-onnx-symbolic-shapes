@@ -6,4 +6,5 @@ rules {
   let blk = shape_value(block_shape);
 
   result output.shape = col2im_shape(shape(data), img, blk);
+  result output.type = type(data);
 }

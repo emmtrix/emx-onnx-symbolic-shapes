@@ -1,8 +1,10 @@
 rules {
   inputs input;
   outputs output;
+  attributes _cos_value_type;
 
   let target = shape_value(input);
 
   result output.shape = target;
+  result output.type = _cos_value_type;
 }

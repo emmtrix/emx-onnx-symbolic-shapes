@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = [unknown_nonnegative()];
+  result output.type = type(input);
 }

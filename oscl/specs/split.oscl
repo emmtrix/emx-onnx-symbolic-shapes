@@ -7,4 +7,5 @@ rules {
   let sizes = shape_value(split_sizes);
 
   result output.shape = split_shape(shape(input), ax, sizes);
+  result output.type = type(input);
 }

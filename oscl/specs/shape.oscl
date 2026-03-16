@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = [rank(data)];
+  result output.type = int64;
 }

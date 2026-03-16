@@ -5,4 +5,5 @@ rules {
   let target = shape_value(target_shape);
 
   result output.shape = broadcast(shape(input), target);
+  result output.type = type(input);
 }

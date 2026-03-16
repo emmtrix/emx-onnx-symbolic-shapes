@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = [];
+  result output.type = int64;
 }

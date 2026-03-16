@@ -8,4 +8,5 @@ rules {
   let st = shape_value(steps);
 
   result output.shape = slice_shape(shape(data), s, e, ax, st);
+  result output.type = type(data);
 }

@@ -3,4 +3,5 @@ rules {
   outputs output;
 
   result output.shape = shape(input);
+  result output.type = type(input);
 }

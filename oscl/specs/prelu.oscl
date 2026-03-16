@@ -3,4 +3,5 @@ rules {
   outputs C;
 
   result C.shape = broadcast(shape(A), shape(B));
+  result C.type = type(A);
 }

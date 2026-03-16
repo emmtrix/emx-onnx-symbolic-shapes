@@ -4,4 +4,5 @@ rules {
   attributes axis, inverse, onesided;
 
   result output.shape = dft_shape(shape(input), axis, onesided);
+  result output.type = type(input);
 }

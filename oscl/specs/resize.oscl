@@ -6,4 +6,5 @@ rules {
   let sz = shape_value(sizes);
 
   result Y.shape = resize_shape(shape(X), sc, sz);
+  result Y.type = type(X);
 }

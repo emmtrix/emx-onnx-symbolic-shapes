@@ -6,4 +6,5 @@ rules {
   let ax = normalize_axis(axis, rank(input));
 
   result output.shape = [prod(prefix(input, ax)), prod(suffix(input, ax))];
+  result output.type = type(input);
 }

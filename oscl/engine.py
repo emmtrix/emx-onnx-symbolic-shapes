@@ -860,6 +860,30 @@ _BUILTINS: dict[str, Any] = {
 
 
 # ---------------------------------------------------------------------------
+# Type name constants  (bare identifiers such as ``int64`` or ``bool``)
+# ---------------------------------------------------------------------------
+
+_TYPE_NAME_CONSTANTS: dict[str, int] = {
+    "float": TensorProto.FLOAT,
+    "float16": TensorProto.FLOAT16,
+    "double": TensorProto.DOUBLE,
+    "int64": TensorProto.INT64,
+    "int32": TensorProto.INT32,
+    "int16": TensorProto.INT16,
+    "int8": TensorProto.INT8,
+    "uint8": TensorProto.UINT8,
+    "uint16": TensorProto.UINT16,
+    "uint32": TensorProto.UINT32,
+    "uint64": TensorProto.UINT64,
+    "bool": TensorProto.BOOL,
+    "bfloat16": TensorProto.BFLOAT16,
+    "complex64": TensorProto.COMPLEX64,
+    "complex128": TensorProto.COMPLEX128,
+    "string": TensorProto.STRING,
+}
+
+
+# ---------------------------------------------------------------------------
 # AST expression evaluator
 # ---------------------------------------------------------------------------
 
@@ -872,11 +896,15 @@ class _EvalEnv:
         shapes: dict[str, list[int | None]],
         attributes: dict[str, Any],
         tensor_values: dict[str, list[int]] | None = None,
+        elem_types: dict[str, Any] | None = None,
     ) -> None:
         self.shapes = dict(shapes)
         self.attributes = dict(attributes)
         self.tensor_values = dict(tensor_values or {})
+        self.elem_types: dict[str, Any] = dict(elem_types or {})
         self.variables: dict[str, Any] = {}
+        # Type name constants (resolve bare identifiers like ``int64``)
+        self.variables.update(_TYPE_NAME_CONSTANTS)
         # Pre-populate variables with shapes (so identifiers resolve to shapes)
         self.variables.update(self.shapes)
         # Attributes are also accessible as variables
@@ -952,9 +980,28 @@ def _eval_binop(op: str, left: Any, right: Any) -> Any:
     return ops[op](left, right)
 
 
+def _eval_type_func(arg: Expr, env: _EvalEnv) -> int:
+    """Evaluate ``type(expr)`` by looking up the element type of the tensor."""
+    if isinstance(arg, Identifier):
+        et = env.elem_types.get(arg.name)
+        if et is not None:
+            return et
+    elif isinstance(arg, IndexExpr) and isinstance(arg.obj, Identifier):
+        et = env.elem_types.get(arg.obj.name)
+        if isinstance(et, list):
+            idx = _eval_expr(arg.index, env)
+            if 0 <= idx < len(et):
+                return et[idx]
+    return TensorProto.UNDEFINED
+
+
 def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     """Evaluate a function call."""
     name = call.name
+
+    # type() needs special handling: resolve element type, not shape
+    if name == "type":
+        return _eval_type_func(call.args[0], env)
 
     # shape_value needs special handling: resolve tensor values, not shape
     if name == "shape_value":
@@ -995,8 +1042,9 @@ def _execute_spec(
     shapes: dict[str, list[int | None]],
     attributes: dict[str, Any],
     tensor_values: dict[str, list[int]] | None = None,
-) -> dict[str, list[int | None]]:
-    """Execute an OTSL spec and return the output shapes.
+    elem_types: dict[str, Any] | None = None,
+) -> tuple[dict[str, list[int | None]], dict[str, int]]:
+    """Execute an OTSL spec and return the output shapes and element types.
 
     Parameters
     ----------
@@ -1009,14 +1057,21 @@ def _execute_spec(
     tensor_values:
         Optional mapping from input name to its concrete integer values
         (needed for shape-tensor inputs like Reshape's ``shape`` input).
+    elem_types:
+        Optional mapping from input name to its ONNX element type
+        (``TensorProto`` enum value).  For variadic inputs the value is a
+        ``list[int]``.
 
     Returns
     -------
-    dict
-        Mapping from output name to the inferred shape.
+    tuple
+        ``(shape_results, type_results)`` where *shape_results* maps output
+        names to inferred shapes and *type_results* maps output names to
+        inferred element types.
     """
-    env = _EvalEnv(shapes, attributes, tensor_values)
-    results: dict[str, list[int | None]] = {}
+    env = _EvalEnv(shapes, attributes, tensor_values, elem_types)
+    shape_results: dict[str, list[int | None]] = {}
+    type_results: dict[str, int] = {}
 
     for stmt in spec.statements:
         if isinstance(stmt, LetStmt):
@@ -1030,12 +1085,12 @@ def _execute_spec(
         elif isinstance(stmt, ResultStmt):
             if stmt.field == "shape":
                 val = _eval_expr(stmt.expr, env)
-                results[stmt.target] = _to_shape(val)
-            # .type results are not evaluated here; element type
-            # propagation is handled separately in _infer_shapes()
-            # (see the "Determine element type" section).
+                shape_results[stmt.target] = _to_shape(val)
+            elif stmt.field == "type":
+                val = _eval_expr(stmt.expr, env)
+                type_results[stmt.target] = int(val)
 
-    return results
+    return shape_results, type_results
 
 
 # ---------------------------------------------------------------------------
@@ -1044,10 +1099,13 @@ def _execute_spec(
 
 # Default attribute values for operators (used when the attribute is absent).
 _DEFAULT_ATTRS: dict[str, dict[str, Any]] = {
+    "Bernoulli": {"dtype": 0},
+    "EyeLike": {"dtype": 0},
     "Flatten": {"axis": 1},
     "Gather": {"axis": 0},
     "GatherND": {"batch_dims": 0},
     "Gemm": {"transA": 0, "transB": 0},
+    "QuantizeLinear": {"output_dtype": 0},
     "Softmax": {"axis": -1},
     "LogSoftmax": {"axis": -1},
     "Hardmax": {"axis": -1},
@@ -1232,24 +1290,35 @@ class OsclShapeInferenceEngine:
 
             # Map ONNX node inputs â†’ OTSL spec input names
             input_shapes: dict[str, list[int | None]] = {}
+            input_elem_types: dict[str, Any] = {}
             tensor_vals: dict[str, list[int]] = {}
 
             if spec.inputs and spec.inputs[0].variadic:
                 # Variadic: all node inputs map to the variadic name
                 var_name = spec.inputs[0].name
                 var_shapes = []
+                var_types: list[int] = []
                 for onnx_in in node.input:
                     if onnx_in and onnx_in in known_shapes:
                         var_shapes.append(known_shapes[onnx_in])
                     else:
                         var_shapes.append([])
+                    if onnx_in:
+                        var_types.append(
+                            known_elem_types.get(onnx_in, TensorProto.UNDEFINED)
+                        )
+                    else:
+                        var_types.append(TensorProto.UNDEFINED)
                 input_shapes[var_name] = var_shapes  # type: ignore[assignment]
+                input_elem_types[var_name] = var_types
             else:
                 for i, inp_decl in enumerate(spec.inputs):
                     if i < len(node.input) and node.input[i]:
                         onnx_name = node.input[i]
                         if onnx_name in known_shapes:
                             input_shapes[inp_decl.name] = known_shapes[onnx_name]
+                        if onnx_name in known_elem_types:
+                            input_elem_types[inp_decl.name] = known_elem_types[onnx_name]
                         if onnx_name in initializer_values:
                             tensor_vals[inp_decl.name] = initializer_values[onnx_name]
 
@@ -1281,12 +1350,11 @@ class OsclShapeInferenceEngine:
 
             # Special case: Constant â€“ output shape from attribute value
             if node.op_type == "Constant":
-                shape = self._handle_constant(node, node_attr_map)
+                shape, et = self._handle_constant(node, node_attr_map)
                 if shape is not None:
                     for onnx_out in node.output:
                         if onnx_out:
                             known_shapes[onnx_out] = shape
-                            et = TensorProto.FLOAT
                             known_elem_types[onnx_out] = et
                             tp = _make_type_proto(shape, et)
                             if onnx_out not in value_info_names:
@@ -1295,6 +1363,29 @@ class OsclShapeInferenceEngine:
                                 vi.type.CopyFrom(tp)
                                 value_info_names.add(onnx_out)
                     continue
+
+
+            # Special case: ConstantOfShape — output type from value attribute
+            if node.op_type == "ConstantOfShape":
+                cos_et = TensorProto.FLOAT  # default per ONNX spec
+                if "value" in node_attr_map:
+                    attr = node_attr_map["value"]
+                    if attr.type == onnx.AttributeProto.TENSOR:
+                        cos_et = attr.t.data_type
+                input_elem_types["_cos_value_type"] = cos_et
+                attrs["_cos_value_type"] = cos_et
+
+            # Special case: QuantizeLinear — resolve output_dtype
+            if node.op_type == "QuantizeLinear":
+                od = attrs.get("output_dtype", 0)
+                if od == 0:
+                    # Fall back to y_zero_point type, then uint8
+                    if len(node.input) >= 3 and node.input[2]:
+                        zp_name = node.input[2]
+                        od = known_elem_types.get(zp_name, TensorProto.UINT8)
+                    else:
+                        od = TensorProto.UINT8
+                attrs["output_dtype"] = od
 
             # Special case: Reduction operators (opset <18 used axes as
             # attribute; opset >= 18 uses axes as second input).
@@ -1447,8 +1538,9 @@ class OsclShapeInferenceEngine:
 
             # Execute the spec --------------------------------------------------
             try:
-                output_shapes = _execute_spec(
-                    spec, input_shapes, attrs, tensor_vals
+                output_shapes, output_types = _execute_spec(
+                    spec, input_shapes, attrs, tensor_vals,
+                    elem_types=input_elem_types,
                 )
             except (
                 ConstraintViolation,
@@ -1470,9 +1562,10 @@ class OsclShapeInferenceEngine:
                     if inferred is not None:
                         known_shapes[onnx_out] = inferred
 
-                        # Determine element type (inherit from first input)
-                        et = TensorProto.UNDEFINED
-                        if node.input:
+                        # Determine element type from spec or inherit from
+                        # the first input as a fallback.
+                        et = output_types.get(out_name, TensorProto.UNDEFINED)
+                        if et == TensorProto.UNDEFINED and node.input:
                             et = known_elem_types.get(
                                 node.input[0], TensorProto.UNDEFINED
                             )
@@ -1502,29 +1595,30 @@ class OsclShapeInferenceEngine:
     @staticmethod
     def _handle_constant(
         node: Any, node_attr_map: dict[str, Any],
-    ) -> list[int | None] | None:
-        """Infer shape of a Constant node from its attribute."""
+    ) -> tuple[list[int | None] | None, int]:
+        """Infer shape and element type of a Constant node from its attribute."""
         if "value" in node_attr_map:
             attr = node_attr_map["value"]
             if attr.type == onnx.AttributeProto.TENSOR:
                 t = attr.t
-                return list(t.dims) if t.dims else []
+                shape = list(t.dims) if t.dims else []
+                return shape, t.data_type
         if "value_int" in node_attr_map:
-            return []
+            return [], TensorProto.INT64
         if "value_float" in node_attr_map:
-            return []
+            return [], TensorProto.FLOAT
         if "value_ints" in node_attr_map:
             attr = node_attr_map["value_ints"]
-            return [len(attr.ints)]
+            return [len(attr.ints)], TensorProto.INT64
         if "value_floats" in node_attr_map:
             attr = node_attr_map["value_floats"]
-            return [len(attr.floats)]
+            return [len(attr.floats)], TensorProto.FLOAT
         if "value_string" in node_attr_map:
-            return []
+            return [], TensorProto.STRING
         if "value_strings" in node_attr_map:
             attr = node_attr_map["value_strings"]
-            return [len(attr.strings)]
-        return None
+            return [len(attr.strings)], TensorProto.STRING
+        return None, TensorProto.UNDEFINED
 
     @staticmethod
     def _handle_split(

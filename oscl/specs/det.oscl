@@ -3,4 +3,5 @@ rules {
   outputs Y;
 
   result Y.shape = prefix(X, -2);
+  result Y.type = type(X);
 }

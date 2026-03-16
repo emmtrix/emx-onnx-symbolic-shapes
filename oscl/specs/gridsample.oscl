@@ -3,4 +3,5 @@ rules {
   outputs Y;
 
   result Y.shape = gridsample_shape(shape(X), shape(grid));
+  result Y.type = type(X);
 }

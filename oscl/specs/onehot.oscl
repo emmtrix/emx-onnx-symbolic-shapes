@@ -7,4 +7,5 @@ rules {
   let ax = normalize_axis(axis, rank(indices) + 1);
 
   result output.shape = onehot_shape(shape(indices), d, ax);
+  result output.type = type(values);
 }
