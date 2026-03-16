@@ -1,7 +1,8 @@
-shape {
+rules {
   inputs X;
   outputs Y;
   attributes kernel_shape, strides, pads, dilations, ceil_mode, auto_pad;
 
-  result Y = pool_shape(shape(X), kernel_shape, strides, pads, dilations, ceil_mode, auto_pad);
+  result Y.shape = pool_shape(shape(X), kernel_shape, strides, pads, dilations, ceil_mode, auto_pad);
+  result Y.type = type(X);
 }

@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs X;
   outputs Y;
 
-  result Y = [rank(X), unknown_nonnegative()];
+  result Y.shape = [rank(X), unknown_nonnegative()];
+  result Y.type = int64;
 }

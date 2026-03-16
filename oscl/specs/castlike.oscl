@@ -1,6 +1,7 @@
-shape {
-  inputs X;
-  outputs Y;
+rules {
+  inputs input, target_type;
+  outputs output;
 
-  result Y = shape(X);
+  result output.shape = shape(input);
+  result output.type = type(target_type);
 }

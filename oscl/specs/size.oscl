@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs data;
   outputs output;
 
-  result output = [];
+  result output.shape = [];
+  result output.type = int64;
 }

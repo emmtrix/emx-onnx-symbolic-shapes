@@ -1,8 +1,9 @@
-shape {
+rules {
   inputs input, target_shape;
   outputs output;
 
   let target = shape_value(target_shape);
 
-  result output = broadcast(shape(input), target);
+  result output.shape = broadcast(shape(input), target);
+  result output.type = type(input);
 }

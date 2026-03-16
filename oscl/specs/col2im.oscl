@@ -1,9 +1,10 @@
-shape {
+rules {
   inputs data, image_shape, block_shape;
   outputs output;
 
   let img = shape_value(image_shape);
   let blk = shape_value(block_shape);
 
-  result output = col2im_shape(shape(data), img, blk);
+  result output.shape = col2im_shape(shape(data), img, blk);
+  result output.type = type(data);
 }

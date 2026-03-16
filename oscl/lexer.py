@@ -10,19 +10,16 @@ __all__ = ["Token", "TokenType", "LexError", "tokenize"]
 
 class TokenType(Enum):
     # Keywords
-    SHAPE = auto()
+    RULES = auto()
     INPUTS = auto()
     OUTPUTS = auto()
     ATTRIBUTES = auto()
     REQUIRE = auto()
     LET = auto()
     RESULT = auto()
-    WHEN = auto()
     IF = auto()
     THEN = auto()
     ELSE = auto()
-    MAP = auto()
-    IN = auto()
     AND = auto()
     OR = auto()
 
@@ -36,6 +33,7 @@ class TokenType(Enum):
     SEMICOLON = auto()
     COMMA = auto()
     COLON = auto()
+    DOT = auto()
 
     # Operators
     EQ = auto()       # ==
@@ -60,19 +58,16 @@ class TokenType(Enum):
 
 
 _KEYWORDS: dict[str, TokenType] = {
-    "shape": TokenType.SHAPE,
+    "rules": TokenType.RULES,
     "inputs": TokenType.INPUTS,
     "outputs": TokenType.OUTPUTS,
     "attributes": TokenType.ATTRIBUTES,
     "require": TokenType.REQUIRE,
     "let": TokenType.LET,
     "result": TokenType.RESULT,
-    "when": TokenType.WHEN,
     "if": TokenType.IF,
     "then": TokenType.THEN,
     "else": TokenType.ELSE,
-    "map": TokenType.MAP,
-    "in": TokenType.IN,
     "and": TokenType.AND,
     "or": TokenType.OR,
 }
@@ -95,11 +90,9 @@ _NEG_NUM_PREDECESSORS = frozenset({
     TokenType.COLON,
     # Keywords that precede an expression
     TokenType.REQUIRE,
-    TokenType.WHEN,
     TokenType.IF,
     TokenType.THEN,
     TokenType.ELSE,
-    TokenType.IN,
     TokenType.AND,
     TokenType.OR,
 })
@@ -244,6 +237,7 @@ def tokenize(source: str) -> list[Token]:
             ";": TokenType.SEMICOLON,
             ",": TokenType.COMMA,
             ":": TokenType.COLON,
+            ".": TokenType.DOT,
             "=": TokenType.ASSIGN,
             "+": TokenType.PLUS,
             "-": TokenType.MINUS,

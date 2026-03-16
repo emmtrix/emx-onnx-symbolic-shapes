@@ -1,6 +1,6 @@
-shape {
+rules {
   inputs;
   outputs output;
 
-  result output = [];
+  result output.shape = [];
 }

@@ -1,6 +1,7 @@
-shape {
-  inputs x;
+rules {
+  inputs x, x_scale;
   outputs y;
 
-  result y = shape(x);
+  result y.shape = shape(x);
+  result y.type = type(x_scale);
 }

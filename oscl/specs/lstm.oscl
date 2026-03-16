@@ -1,7 +1,8 @@
-shape {
+rules {
   inputs X, W;
   outputs Y;
   attributes hidden_size;
 
-  result Y = rnn_shape(shape(X), hidden_size, 1);
+  result Y.shape = rnn_shape(shape(X), hidden_size, 1);
+  result Y.type = type(X);
 }

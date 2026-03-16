@@ -1,7 +1,8 @@
-shape {
+rules {
   inputs Xs[];
   outputs Y;
   attributes equation;
 
-  result Y = einsum_shape(Xs, equation);
+  result Y.shape = einsum_shape(Xs, equation);
+  result Y.type = type(Xs[0]);
 }

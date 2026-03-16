@@ -1,9 +1,10 @@
-shape {
+rules {
   inputs data, indices;
   outputs output;
   attributes axis;
 
   let ax = normalize_axis(axis, rank(data));
 
-  result output = concat(concat(prefix(data, ax), shape(indices)), suffix(data, ax + 1));
+  result output.shape = concat(concat(prefix(data, ax), shape(indices)), suffix(data, ax + 1));
+  result output.type = type(data);
 }

@@ -11,7 +11,6 @@ from .ast import (
     IndexExpr,
     InputDecl,
     LetStmt,
-    MapExpr,
     NumberLit,
     RequireStmt,
     ResultStmt,
@@ -20,7 +19,6 @@ from .ast import (
     Statement,
     StringLit,
     UnknownDim,
-    WhenStmt,
 )
 from .lexer import Token, TokenType, tokenize
 
@@ -77,7 +75,7 @@ class _Parser:
     # -----------------------------------------------------------------
 
     def parse_spec(self) -> ShapeSpec:
-        self._expect(TokenType.SHAPE)
+        self._expect(TokenType.RULES)
         self._expect(TokenType.LBRACE)
 
         inputs: list[InputDecl] = []
@@ -156,8 +154,6 @@ class _Parser:
             return self._parse_let()
         if tok.type == TokenType.RESULT:
             return self._parse_result()
-        if tok.type == TokenType.WHEN:
-            return self._parse_when()
         raise ParseError(
             f"Expected statement, got {tok.type.name} ({tok.value!r})",
             tok.line,
@@ -180,21 +176,13 @@ class _Parser:
 
     def _parse_result(self) -> ResultStmt:
         self._expect(TokenType.RESULT)
-        name = self._expect(TokenType.IDENT).value
+        target = self._expect(TokenType.IDENT).value
+        self._expect(TokenType.DOT)
+        field = self._expect(TokenType.IDENT).value
         self._expect(TokenType.ASSIGN)
         expr = self._parse_expr()
         self._expect(TokenType.SEMICOLON)
-        return ResultStmt(name, expr)
-
-    def _parse_when(self) -> WhenStmt:
-        self._expect(TokenType.WHEN)
-        cond = self._parse_expr()
-        self._expect(TokenType.LBRACE)
-        body: list[Statement] = []
-        while not self._peek(TokenType.RBRACE) and not self._peek(TokenType.EOF):
-            body.append(self._parse_statement())
-        self._expect(TokenType.RBRACE)
-        return WhenStmt(cond, body)
+        return ResultStmt(target, field, expr)
 
     # -----------------------------------------------------------------
     # Expression grammar (precedence climbing)
@@ -290,26 +278,9 @@ class _Parser:
         if tok.type == TokenType.IF:
             return self._parse_if_expr()
 
-        # map var in iter: body
-        if tok.type == TokenType.MAP:
-            return self._parse_map_expr()
-
         # Identifier-led: plain ident, function call, or index access
         if tok.type == TokenType.IDENT:
             return self._parse_ident_expr()
-
-        # 'shape' used as a function call (e.g., shape(X))
-        if tok.type == TokenType.SHAPE and self.tokens[self.pos + 1].type == TokenType.LPAREN:
-            self._advance()  # consume the SHAPE keyword
-            self._advance()  # consume LPAREN
-            args: list[Expr] = []
-            if not self._peek(TokenType.RPAREN):
-                args.append(self._parse_expr())
-                while self._peek(TokenType.COMMA):
-                    self._advance()
-                    args.append(self._parse_expr())
-            self._expect(TokenType.RPAREN)
-            return FuncCall("shape", args)
 
         raise ParseError(
             f"Expected expression, got {tok.type.name} ({tok.value!r})",
@@ -336,15 +307,6 @@ class _Parser:
         self._expect(TokenType.ELSE)
         else_expr = self._parse_expr()
         return IfExpr(cond, then_expr, else_expr)
-
-    def _parse_map_expr(self) -> MapExpr:
-        self._expect(TokenType.MAP)
-        var = self._expect(TokenType.IDENT).value
-        self._expect(TokenType.IN)
-        iter_expr = self._parse_primary()
-        self._expect(TokenType.COLON)
-        body = self._parse_expr()
-        return MapExpr(var, iter_expr, body)
 
     def _parse_ident_expr(self) -> Expr:
         name_tok = self._expect(TokenType.IDENT)

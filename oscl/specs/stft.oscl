@@ -1,9 +1,10 @@
-shape {
+rules {
   inputs signal, frame_step, window;
   outputs output;
   attributes onesided;
 
   let fs = shape_value(frame_step);
 
-  result output = stft_shape(shape(signal), fs, shape(window), onesided);
+  result output.shape = stft_shape(shape(signal), fs, shape(window), onesided);
+  result output.type = type(signal);
 }

@@ -1,4 +1,4 @@
-shape {
+rules {
   inputs data, starts, ends, axes, steps;
   outputs output;
 
@@ -7,5 +7,6 @@ shape {
   let ax = shape_value(axes);
   let st = shape_value(steps);
 
-  result output = slice_shape(shape(data), s, e, ax, st);
+  result output.shape = slice_shape(shape(data), s, e, ax, st);
+  result output.type = type(data);
 }

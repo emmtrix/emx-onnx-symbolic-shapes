@@ -1,8 +1,9 @@
-shape {
+rules {
   inputs input, repeats;
   outputs output;
 
   let reps = shape_value(repeats);
 
-  result output = tile_shape(shape(input), reps);
+  result output.shape = tile_shape(shape(input), reps);
+  result output.type = type(input);
 }

@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs input, condition;
   outputs output;
 
-  result output = [unknown_nonnegative()];
+  result output.shape = [unknown_nonnegative()];
+  result output.type = type(input);
 }

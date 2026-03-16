@@ -1,7 +1,8 @@
-shape {
+rules {
   inputs data, indices;
   outputs output;
   attributes batch_dims;
 
-  result output = gathernd_shape(shape(data), shape(indices), batch_dims);
+  result output.shape = gathernd_shape(shape(data), shape(indices), batch_dims);
+  result output.type = type(data);
 }

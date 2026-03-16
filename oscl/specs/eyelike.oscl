@@ -1,6 +1,8 @@
-shape {
-  inputs X;
-  outputs Y;
+rules {
+  inputs input;
+  outputs output;
+  attributes dtype;
 
-  result Y = shape(X);
+  result output.shape = shape(input);
+  result output.type = if dtype != 0 then dtype else type(input);
 }

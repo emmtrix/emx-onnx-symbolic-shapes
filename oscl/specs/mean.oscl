@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs Xs[];
   outputs Y;
 
-  result Y = shape(Xs[0]);
+  result Y.shape = shape(Xs[0]);
+  result Y.type = type(Xs[0]);
 }

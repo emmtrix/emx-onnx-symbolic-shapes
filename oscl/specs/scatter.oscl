@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs data, indices, updates;
   outputs output;
 
-  result output = shape(data);
+  result output.shape = shape(data);
+  result output.type = type(data);
 }

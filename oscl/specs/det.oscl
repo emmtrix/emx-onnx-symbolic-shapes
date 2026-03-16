@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs X;
   outputs Y;
 
-  result Y = prefix(X, -2);
+  result Y.shape = prefix(X, -2);
+  result Y.type = type(X);
 }

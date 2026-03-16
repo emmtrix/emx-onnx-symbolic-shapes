@@ -1,4 +1,4 @@
-shape {
+rules {
   inputs X, K;
   outputs Values, Indices;
   attributes axis;
@@ -6,6 +6,8 @@ shape {
   let ax = normalize_axis(axis, rank(X));
   let k_val = shape_value(K);
 
-  result Values = topk_shape(shape(X), ax, k_val);
-  result Indices = topk_shape(shape(X), ax, k_val);
+  result Values.shape = topk_shape(shape(X), ax, k_val);
+  result Indices.shape = topk_shape(shape(X), ax, k_val);
+  result Values.type = type(X);
+  result Indices.type = int64;
 }

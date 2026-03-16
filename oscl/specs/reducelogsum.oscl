@@ -1,9 +1,10 @@
-shape {
+rules {
   inputs data, axes;
   outputs reduced;
   attributes keepdims, noop_with_empty_axes;
 
   let target_axes = shape_value(axes);
 
-  result reduced = reduce_shape(shape(data), target_axes, keepdims);
+  result reduced.shape = reduce_shape(shape(data), target_axes, keepdims);
+  result reduced.type = type(data);
 }

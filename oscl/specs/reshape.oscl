@@ -1,8 +1,9 @@
-shape {
+rules {
   inputs data, shape_input;
   outputs reshaped;
 
   let target = shape_value(shape_input);
 
-  result reshaped = resolve_reshape(shape(data), target);
+  result reshaped.shape = resolve_reshape(shape(data), target);
+  result reshaped.type = type(data);
 }

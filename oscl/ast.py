@@ -16,11 +16,9 @@ __all__ = [
     "ShapeLiteral",
     "IndexExpr",
     "IfExpr",
-    "MapExpr",
     "RequireStmt",
     "LetStmt",
     "ResultStmt",
-    "WhenStmt",
     "InputDecl",
     "ShapeSpec",
 ]
@@ -94,14 +92,6 @@ class IfExpr(Expr):
     else_expr: Expr
 
 
-@dataclass
-class MapExpr(Expr):
-    """Map comprehension: ``map var in iter: body``."""
-    var: str
-    iter_expr: Expr
-    body: Expr
-
-
 # ---------------------------------------------------------------------------
 # Statement nodes
 # ---------------------------------------------------------------------------
@@ -126,16 +116,10 @@ class LetStmt(Statement):
 
 @dataclass
 class ResultStmt(Statement):
-    """``result name = expr;``"""
-    name: str
+    """``result name.field = expr;``"""
+    target: str
+    field: str
     expr: Expr
-
-
-@dataclass
-class WhenStmt(Statement):
-    """``when condition { body }``"""
-    condition: Expr
-    body: list[Statement]
 
 
 # ---------------------------------------------------------------------------

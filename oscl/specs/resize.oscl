@@ -1,9 +1,10 @@
-shape {
+rules {
   inputs X, roi, scales, sizes;
   outputs Y;
 
   let sc = shape_value(scales);
   let sz = shape_value(sizes);
 
-  result Y = resize_shape(shape(X), sc, sz);
+  result Y.shape = resize_shape(shape(X), sc, sz);
+  result Y.type = type(X);
 }

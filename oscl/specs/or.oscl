@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs A, B;
   outputs C;
 
-  result C = broadcast(shape(A), shape(B));
+  result C.shape = broadcast(shape(A), shape(B));
+  result C.type = bool;
 }

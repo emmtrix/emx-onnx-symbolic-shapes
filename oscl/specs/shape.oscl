@@ -1,6 +1,7 @@
-shape {
+rules {
   inputs data;
   outputs output;
 
-  result output = [rank(data)];
+  result output.shape = [rank(data)];
+  result output.type = int64;
 }

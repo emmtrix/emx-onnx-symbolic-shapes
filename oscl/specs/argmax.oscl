@@ -1,7 +1,8 @@
-shape {
+rules {
   inputs data;
   outputs reduced;
   attributes axis, keepdims;
 
-  result reduced = reduce_shape(shape(data), [axis], keepdims);
+  result reduced.shape = reduce_shape(shape(data), [axis], keepdims);
+  result reduced.type = int64;
 }

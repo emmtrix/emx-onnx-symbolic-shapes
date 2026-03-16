@@ -160,6 +160,17 @@ def _get_output_shapes(model: ModelProto) -> dict[str, list[int]]:
     return result
 
 
+def _get_output_types(model: ModelProto) -> dict[str, int]:
+    """Extract output element types from graph.output as ``{name: elem_type}``."""
+    result: dict[str, int] = {}
+    for out in model.graph.output:
+        if out.type.HasField("tensor_type"):
+            et = out.type.tensor_type.elem_type
+            if et != TensorProto.UNDEFINED:
+                result[out.name] = et
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Test-case collection
 # ---------------------------------------------------------------------------
@@ -247,7 +258,7 @@ _TEST_PARAMS = _build_test_params()
 
 @pytest.mark.parametrize("test_case, op_type", _TEST_PARAMS)
 def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
-    """Compare OTSL engine output shapes against ONNX official inference."""
+    """Compare OTSL engine output shapes and types against ONNX official inference."""
     model = test_case.model
     data_set = test_case.data_sets[0]
     input_arrays: list[np.ndarray] = list(data_set[0])
@@ -260,12 +271,14 @@ def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
     # which the ONNX test framework pre-populates with correct shapes.
     onnx_inferred = shape_inference.infer_shapes(enriched_model)
     onnx_shapes = _get_output_shapes(onnx_inferred)
+    onnx_types = _get_output_types(onnx_inferred)
 
     # OTSL engine inference
     oscl_inferred = _ENGINE.infer_shapes(enriched_model)
     oscl_shapes = _get_output_shapes(oscl_inferred)
+    oscl_types = _get_output_types(oscl_inferred)
 
-    # Compare every output
+    # Compare every output shape
     for out_name, onnx_shape in onnx_shapes.items():
         oscl_shape = oscl_shapes.get(out_name)
         assert oscl_shape is not None, (
@@ -274,6 +287,17 @@ def test_oscl_vs_onnx(test_case: Any, op_type: str) -> None:
         assert oscl_shape == onnx_shape, (
             f"[{op_type}/{test_case.name}] output {out_name!r}: "
             f"OTSL={oscl_shape} vs ONNX={onnx_shape}"
+        )
+
+    # Compare every output element type
+    for out_name, onnx_type in onnx_types.items():
+        oscl_type = oscl_types.get(out_name)
+        assert oscl_type is not None, (
+            f"OTSL engine did not produce type for output {out_name!r}"
+        )
+        assert oscl_type == onnx_type, (
+            f"[{op_type}/{test_case.name}] output {out_name!r}: "
+            f"OTSL type={oscl_type} vs ONNX type={onnx_type}"
         )
 
 
@@ -474,3 +498,105 @@ class TestEngineBasic:
         m = self._simple_model("Relu", [[2, 3]])
         result = oscl_infer_shapes(m)
         assert isinstance(result, ModelProto)
+
+    # --- Type inference tests ---
+
+    @staticmethod
+    def _typed_model(
+        op_type: str,
+        input_specs: list[tuple[list[int], int]],
+        output_names: list[str] | None = None,
+        attrs: dict[str, Any] | None = None,
+        initializers: list[tuple[str, np.ndarray]] | None = None,
+    ) -> ModelProto:
+        """Create a model with explicit input element types."""
+        input_infos = []
+        input_names = []
+        for i, (shape, elem_type) in enumerate(input_specs):
+            name = f"input_{i}"
+            input_names.append(name)
+            input_infos.append(
+                helper.make_tensor_value_info(name, elem_type, shape)
+            )
+        if output_names is None:
+            output_names = ["output"]
+        output_infos = [
+            helper.make_tensor_value_info(n, TensorProto.UNDEFINED, None)
+            for n in output_names
+        ]
+        kwargs: dict[str, Any] = {}
+        if attrs:
+            kwargs.update(attrs)
+        node = helper.make_node(op_type, input_names, output_names, **kwargs)
+        inits = []
+        if initializers:
+            for init_name, arr in initializers:
+                inits.append(numpy_helper.from_array(arr, name=init_name))
+        graph = helper.make_graph(
+            [node], "test_graph", input_infos, output_infos, initializer=inits
+        )
+        return helper.make_model(
+            graph, opset_imports=[helper.make_opsetid("", 21)]
+        )
+
+    def test_type_passthrough(self) -> None:
+        """Unary op preserves input type."""
+        m = self._typed_model("Relu", [([2, 3], TensorProto.DOUBLE)])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.DOUBLE}
+
+    def test_type_broadcast(self) -> None:
+        """Binary broadcast op preserves first input type."""
+        m = self._typed_model("Add", [
+            ([3, 4], TensorProto.FLOAT16),
+            ([3, 4], TensorProto.FLOAT16),
+        ])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.FLOAT16}
+
+    def test_type_comparison_bool(self) -> None:
+        """Comparison op produces bool."""
+        m = self._typed_model("Equal", [
+            ([3, 4], TensorProto.INT64),
+            ([3, 4], TensorProto.INT64),
+        ])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.BOOL}
+
+    def test_type_argmax_int64(self) -> None:
+        """ArgMax produces int64."""
+        m = self._typed_model("ArgMax", [([3, 4], TensorProto.FLOAT)])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.INT64}
+
+    def test_type_cast(self) -> None:
+        """Cast changes type per 'to' attribute."""
+        m = self._typed_model(
+            "Cast",
+            [([2, 3], TensorProto.FLOAT)],
+            attrs={"to": TensorProto.INT64},
+        )
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.INT64}
+
+    def test_type_shape_int64(self) -> None:
+        """Shape op always returns int64."""
+        m = self._typed_model("Shape", [([2, 3, 4], TensorProto.FLOAT)])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.INT64}
+
+    def test_type_nonzero_int64(self) -> None:
+        """NonZero always returns int64."""
+        m = self._typed_model("NonZero", [([2, 2], TensorProto.DOUBLE)])
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.INT64}
+
+    def test_type_concat_passthrough(self) -> None:
+        """Concat preserves input type."""
+        m = self._typed_model(
+            "Concat",
+            [([2, 3], TensorProto.DOUBLE), ([2, 4], TensorProto.DOUBLE)],
+            attrs={"axis": 1},
+        )
+        result = oscl_infer_shapes(m)
+        assert _get_output_types(result) == {"output": TensorProto.DOUBLE}
