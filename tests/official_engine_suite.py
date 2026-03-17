@@ -43,6 +43,14 @@ class OfficialTestCase:
     url: str | None
 
 
+@dataclass(frozen=True)
+class OfficialCaseExpectation:
+    """One official test case paired with its frozen comparison result."""
+
+    case: OfficialTestCase
+    expected_comparison_result: str
+
+
 ENGINE = OtslShapeInferenceEngine()
 
 
@@ -73,6 +81,31 @@ def load_expected_results(path: Path = EXPECTED_RESULTS_PATH) -> dict[str, Any]:
     """Load the JSON document containing expected comparison results."""
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def build_case_expectations(
+    cases: list[OfficialTestCase],
+    expected_results: dict[str, Any],
+) -> list[OfficialCaseExpectation]:
+    """Pair each official test case with its expected comparison result."""
+    expectations: list[OfficialCaseExpectation] = []
+    tests = expected_results["tests"]
+
+    for case in cases:
+        if case.case_id not in tests:
+            raise AssertionError(
+                f"Missing expected result entry for official test {case.case_id!r}"
+            )
+        expectations.append(
+            OfficialCaseExpectation(
+                case=case,
+                expected_comparison_result=tests[case.case_id]["expected"][
+                    "comparison_result"
+                ],
+            )
+        )
+
+    return expectations
 
 
 def render_status_page(document: dict[str, Any]) -> str:

@@ -12,6 +12,8 @@ from onnx import ModelProto, TensorProto, helper, numpy_helper
 from otsl.engine import infer_shapes as otsl_infer_shapes
 from tests.official_engine_suite import (
     EXPECTED_RESULTS_PATH,
+    OfficialCaseExpectation,
+    build_case_expectations,
     collect_official_test_cases,
     compare_case,
     get_output_shapes,
@@ -25,22 +27,11 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"numpy\.")
 
 _OFFICIAL_CASES = collect_official_test_cases()
 _EXPECTED_RESULTS = load_expected_results()
-
-
-def _build_test_params() -> list[pytest.param]:
-    params: list[pytest.param] = []
-    tests = _EXPECTED_RESULTS["tests"]
-    for case in _OFFICIAL_CASES:
-        if case.case_id not in tests:
-            raise AssertionError(
-                f"Missing expected result entry for official test {case.case_id!r}"
-            )
-        expected_result = tests[case.case_id]["expected"]["comparison_result"]
-        params.append(pytest.param(case, expected_result, id=case.case_id))
-    return params
-
-
-_TEST_PARAMS = _build_test_params()
+_CASE_EXPECTATIONS = build_case_expectations(_OFFICIAL_CASES, _EXPECTED_RESULTS)
+_OFFICIAL_CASE_PARAMS = [
+    pytest.param(expectation, id=expectation.case.case_id)
+    for expectation in _CASE_EXPECTATIONS
+]
 
 
 def test_expected_results_cover_all_official_cases() -> None:
@@ -53,10 +44,14 @@ def test_expected_results_cover_all_official_cases() -> None:
     assert EXPECTED_RESULTS_PATH.exists()
 
 
-@pytest.mark.parametrize("case, expected_result", _TEST_PARAMS)
-def test_otsl_vs_onnx(case: Any, expected_result: str) -> None:
-    actual_result = compare_case(case)
-    assert actual_result == expected_result
+@pytest.mark.parametrize("expectation", _OFFICIAL_CASE_PARAMS)
+def test_otsl_vs_onnx(expectation: OfficialCaseExpectation) -> None:
+    actual_result = compare_case(expectation.case)
+    assert actual_result == expectation.expected_comparison_result, (
+        f"{expectation.case.case_id}: "
+        f"expected {expectation.expected_comparison_result!r}, "
+        f"got {actual_result!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
