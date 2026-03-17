@@ -15,31 +15,22 @@
 | 3 | InferenceError: [TypeInferenceError] type case mismatch. existing=optional_type inferred=tensor_type |
 | 3 | output 'selected_indices' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 3]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [3, 3]} |
 | 2 | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [4]} |
-| 2 | output 'output_1' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [0]} |
 | 2 | output 'selected_indices' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 3]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [1, 3]} |
 | 2 | output 'selected_indices' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 3]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [2, 3]} |
 | 2 | output 'selected_indices' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 3]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [4, 3]} |
 | 2 | output 'y' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["N"]}, "kind": "sequence"} |
 | 2 | output 'y' mismatch: OTSL={"elem_type": "STRING", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "STRING", "kind": "tensor", "shape": [1]} |
 | 2 | output 'y' mismatch: OTSL={"elem_type": "STRING", "kind": "tensor", "shape": [1, "?"]} ONNX={"elem_type": "STRING", "kind": "tensor", "shape": [1, 4]} |
-| 1 | output 'Y' mismatch: OTSL={"elem_type": "BOOL", "kind": "tensor", "shape": [2, "?"]} ONNX={"elem_type": "BOOL", "kind": "tensor", "shape": [2, 0]} |
 | 1 | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, "?", 3]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 2, 3]} |
 | 1 | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, "?", 8]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 8, 8]} |
 | 1 | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 1, "?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 1, 2]} |
 | 1 | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 7, "?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [1, 1, 7, 7]} |
 | 1 | output 'Y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [1]} |
-| 1 | output 'length' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0]} |
 | 1 | output 'out' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, "?", 4]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, "unk__0", 4]} |
 | 1 | output 'output' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [2]} |
-| 1 | output 'reduced' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, "?", 1]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, 0, 1]} |
-| 1 | output 'reshaped' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 4, "?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 4, 0]} |
 | 1 | output 'result' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": [2, "?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [2, 3]} |
 | 1 | output 'seq' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["?", 6]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["unk__0", 6]}, "kind": "sequence"} |
-| 1 | output 'y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [20, "?", 5]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [20, 0, 5]} |
-| 1 | output 'y' mismatch: OTSL={"elem_type": "INT32", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT32", "kind": "tensor", "shape": [0]} |
-| 1 | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 5]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0, 5]} |
-| 1 | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0]} |
-| 1 | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": [3, "?", 5]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [3, 0, 5]} |
+| 1 | output 'substrings' mismatch: OTSL={"elem_type": "STRING", "kind": "tensor", "shape": [0, "?"]} ONNX={"elem_type": "STRING", "kind": "tensor", "shape": [0, "unk__0"]} |
 
 ## Test Cases
 
@@ -549,7 +540,7 @@
 | node::test_constant_pad_axes | OK |
 | node::test_constant_pad_negative_axes | OK |
 | node::test_constantofshape_float_ones | OK |
-| node::test_constantofshape_int_shape_zero | output 'y' mismatch: OTSL={"elem_type": "INT32", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT32", "kind": "tensor", "shape": [0]} |
+| node::test_constantofshape_int_shape_zero | OK |
 | node::test_constantofshape_int_zeros | OK |
 | node::test_conv_with_autopad_same | OK |
 | node::test_conv_with_strides_and_asymmetric_padding | OK |
@@ -1249,7 +1240,7 @@
 | node::test_reduce_sum_empty_axes_input_noop | OK |
 | node::test_reduce_sum_empty_axes_input_noop_example | OK |
 | node::test_reduce_sum_empty_set | OK |
-| node::test_reduce_sum_empty_set_non_reduced_axis_zero | output 'reduced' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, "?", 1]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [2, 0, 1]} |
+| node::test_reduce_sum_empty_set_non_reduced_axis_zero | OK |
 | node::test_reduce_sum_keepdims_example | OK |
 | node::test_reduce_sum_keepdims_random | OK |
 | node::test_reduce_sum_negative_axes_keepdims_example | OK |
@@ -1275,10 +1266,10 @@
 | node::test_reflect_pad | OK |
 | node::test_regex_full_match_basic | OK |
 | node::test_regex_full_match_email_domain | OK |
-| node::test_regex_full_match_empty | output 'Y' mismatch: OTSL={"elem_type": "BOOL", "kind": "tensor", "shape": [2, "?"]} ONNX={"elem_type": "BOOL", "kind": "tensor", "shape": [2, 0]} |
+| node::test_regex_full_match_empty | OK |
 | node::test_relu | OK |
 | node::test_relu_expanded_ver18 | OK |
-| node::test_reshape_allowzero_reordered | output 'reshaped' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 4, "?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 4, 0]} |
+| node::test_reshape_allowzero_reordered | OK |
 | node::test_reshape_extended_dims | OK |
 | node::test_reshape_negative_dim | OK |
 | node::test_reshape_negative_extended_dims | OK |
@@ -1500,7 +1491,7 @@
 | node::test_shape_start_1 | OK |
 | node::test_shape_start_1_end_2 | OK |
 | node::test_shape_start_1_end_negative_1 | OK |
-| node::test_shape_start_greater_than_end | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0]} |
+| node::test_shape_start_greater_than_end | OK |
 | node::test_shape_start_negative_1 | OK |
 | node::test_shrink_hard | OK |
 | node::test_shrink_hard_expanded_ver18 | OK |
@@ -1525,7 +1516,7 @@
 | node::test_slice_neg | OK |
 | node::test_slice_neg_steps | OK |
 | node::test_slice_negative_axes | OK |
-| node::test_slice_start_out_of_bounds | output 'y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": [20, "?", 5]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [20, 0, 5]} |
+| node::test_slice_start_out_of_bounds | OK |
 | node::test_softmax_axis_0 | OK |
 | node::test_softmax_axis_0_expanded | OK |
 | node::test_softmax_axis_0_expanded_ver18 | OK |
@@ -1574,8 +1565,8 @@
 | node::test_split_variable_parts_2d_opset18 | OK |
 | node::test_split_variable_parts_default_axis_opset13 | OK |
 | node::test_split_variable_parts_default_axis_opset18 | OK |
-| node::test_split_zero_size_splits_opset13 | output 'output_1' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [0]} |
-| node::test_split_zero_size_splits_opset18 | output 'output_1' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [0]} |
+| node::test_split_zero_size_splits_opset13 | OK |
+| node::test_split_zero_size_splits_opset18 | OK |
 | node::test_sqrt | OK |
 | node::test_sqrt_example | OK |
 | node::test_squeeze | OK |
@@ -1590,7 +1581,7 @@
 | node::test_string_split_basic | OK |
 | node::test_string_split_consecutive_delimiters | OK |
 | node::test_string_split_empty_string_delimiter | OK |
-| node::test_string_split_empty_tensor | output 'length' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0]} |
+| node::test_string_split_empty_tensor | output 'substrings' mismatch: OTSL={"elem_type": "STRING", "kind": "tensor", "shape": [0, "?"]} ONNX={"elem_type": "STRING", "kind": "tensor", "shape": [0, "unk__0"]} |
 | node::test_string_split_maxsplit | OK |
 | node::test_string_split_no_delimiter | OK |
 | node::test_strnormalizer_export_monday_casesensintive_lower | output 'y' mismatch: OTSL={"elem_type": "STRING", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "STRING", "kind": "tensor", "shape": [3]} |
@@ -1663,7 +1654,7 @@
 | node::test_tril_pos | OK |
 | node::test_tril_square | OK |
 | node::test_tril_square_neg | OK |
-| node::test_tril_zero | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": [3, "?", 5]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [3, 0, 5]} |
+| node::test_tril_zero | OK |
 | node::test_triu | OK |
 | node::test_triu_neg | OK |
 | node::test_triu_one_row | OK |
@@ -1672,7 +1663,7 @@
 | node::test_triu_pos | OK |
 | node::test_triu_square | OK |
 | node::test_triu_square_neg | OK |
-| node::test_triu_zero | output 'y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?", 5]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [0, 5]} |
+| node::test_triu_zero | OK |
 | node::test_unique_length_1 | output 'Y' mismatch: OTSL={"elem_type": "INT64", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "INT64", "kind": "tensor", "shape": [1]} |
 | node::test_unique_not_sorted_without_axis | output 'Y' mismatch: OTSL={"elem_type": "FLOAT", "kind": "tensor", "shape": ["?"]} ONNX={"elem_type": "FLOAT", "kind": "tensor", "shape": [4]} |
 | node::test_unique_sorted_with_axis | OK |

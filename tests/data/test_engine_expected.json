@@ -4047,7 +4047,7 @@
     },
     "node::test_constantofshape_int_shape_zero": {
       "expected": {
-        "comparison_result": "output 'y' mismatch: OTSL={\"elem_type\": \"INT32\", \"kind\": \"tensor\", \"shape\": [\"?\"]} ONNX={\"elem_type\": \"INT32\", \"kind\": \"tensor\", \"shape\": [0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_constantofshape_int_shape_zero",
@@ -9647,7 +9647,7 @@
     },
     "node::test_reduce_sum_empty_set_non_reduced_axis_zero": {
       "expected": {
-        "comparison_result": "output 'reduced' mismatch: OTSL={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [2, \"?\", 1]} ONNX={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [2, 0, 1]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_reduce_sum_empty_set_non_reduced_axis_zero",
@@ -9855,7 +9855,7 @@
     },
     "node::test_regex_full_match_empty": {
       "expected": {
-        "comparison_result": "output 'Y' mismatch: OTSL={\"elem_type\": \"BOOL\", \"kind\": \"tensor\", \"shape\": [2, \"?\"]} ONNX={\"elem_type\": \"BOOL\", \"kind\": \"tensor\", \"shape\": [2, 0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_regex_full_match_empty",
@@ -9879,7 +9879,7 @@
     },
     "node::test_reshape_allowzero_reordered": {
       "expected": {
-        "comparison_result": "output 'reshaped' mismatch: OTSL={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [3, 4, \"?\"]} ONNX={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [3, 4, 0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_reshape_allowzero_reordered",
@@ -11655,7 +11655,7 @@
     },
     "node::test_shape_start_greater_than_end": {
       "expected": {
-        "comparison_result": "output 'y' mismatch: OTSL={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [\"?\"]} ONNX={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_shape_start_greater_than_end",
@@ -11855,7 +11855,7 @@
     },
     "node::test_slice_start_out_of_bounds": {
       "expected": {
-        "comparison_result": "output 'y' mismatch: OTSL={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [20, \"?\", 5]} ONNX={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [20, 0, 5]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_slice_start_out_of_bounds",
@@ -12247,7 +12247,7 @@
     },
     "node::test_split_zero_size_splits_opset13": {
       "expected": {
-        "comparison_result": "output 'output_1' mismatch: OTSL={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [\"?\"]} ONNX={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_split_zero_size_splits_opset13",
@@ -12255,7 +12255,7 @@
     },
     "node::test_split_zero_size_splits_opset18": {
       "expected": {
-        "comparison_result": "output 'output_1' mismatch: OTSL={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [\"?\"]} ONNX={\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [0]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_split_zero_size_splits_opset18",
@@ -12375,7 +12375,7 @@
     },
     "node::test_string_split_empty_tensor": {
       "expected": {
-        "comparison_result": "output 'length' mismatch: OTSL={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [\"?\"]} ONNX={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [0]}"
+        "comparison_result": "output 'substrings' mismatch: OTSL={\"elem_type\": \"STRING\", \"kind\": \"tensor\", \"shape\": [0, \"?\"]} ONNX={\"elem_type\": \"STRING\", \"kind\": \"tensor\", \"shape\": [0, \"unk__0\"]}"
       },
       "kind": "node",
       "model_name": "test_string_split_empty_tensor",
@@ -12959,7 +12959,7 @@
     },
     "node::test_tril_zero": {
       "expected": {
-        "comparison_result": "output 'y' mismatch: OTSL={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [3, \"?\", 5]} ONNX={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [3, 0, 5]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_tril_zero",
@@ -13031,7 +13031,7 @@
     },
     "node::test_triu_zero": {
       "expected": {
-        "comparison_result": "output 'y' mismatch: OTSL={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [\"?\", 5]} ONNX={\"elem_type\": \"INT64\", \"kind\": \"tensor\", \"shape\": [0, 5]}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_triu_zero",

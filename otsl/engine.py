@@ -1525,12 +1525,11 @@ def _get_shape_from_type(tp: TypeProto) -> list[int | None] | None:
         return None
     dims: list[int | None] = []
     for d in tt.shape.dim:
-        if d.dim_value > 0:
+        if d.HasField("dim_value"):
             dims.append(d.dim_value)
         elif d.dim_param:
             dims.append(None)  # symbolic -> unknown
         else:
-            # dim_value == 0 can mean unknown or scalar dim
             dims.append(None)
     return dims
 

@@ -116,10 +116,26 @@ class TestEngineBasic:
         result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"output": [2, 3, 4]}
 
+    def test_relu_preserves_zero_dim(self) -> None:
+        m = self._simple_model("Relu", [[2, 0, 4]])
+        result = otsl_infer_shapes(m)
+        assert get_output_shapes(result) == {"output": [2, 0, 4]}
+
     def test_split_without_num_outputs_uses_node_output_count(self) -> None:
         m = self._simple_model("Split", [[2, 4]], output_names=["left", "right"], attrs={"axis": 1})
         result = otsl_infer_shapes(m)
         assert get_output_shapes(result) == {"left": [2, 2], "right": [2, 2]}
+
+    def test_split_preserves_zero_sized_outputs(self) -> None:
+        split = np.array([0, 3], dtype=np.int64)
+        m = self._simple_model(
+            "Split",
+            [[3], [2]],
+            output_names=["left", "right"],
+            initializers=[("input_1", split)],
+        )
+        result = otsl_infer_shapes(m)
+        assert get_output_shapes(result) == {"left": [0], "right": [3]}
 
     def test_matmul_2d(self) -> None:
         m = self._simple_model("MatMul", [[3, 4], [4, 5]])
