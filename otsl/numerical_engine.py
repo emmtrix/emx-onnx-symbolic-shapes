@@ -1,4 +1,4 @@
-"""OTSL-based shape inference engine for ONNX models.
+"""OTSL-based numerical shape inference engine for ONNX models.
 
 This module provides an :func:`infer_shapes` function whose interface mirrors
 ``onnx.shape_inference.infer_shapes``.  Internally it evaluates the bundled
@@ -33,7 +33,7 @@ from .ast import (
 )
 from .loader import load_all_specs
 
-__all__ = ["infer_shapes", "OtslShapeInferenceEngine"]
+__all__ = ["infer_shapes", "OtslNumericalShapeInferenceEngine"]
 
 # Sentinel for unknown dimensions (data-dependent).
 _UNKNOWN = None
@@ -1962,12 +1962,12 @@ def _get_attribute_values(attr: onnx.AttributeProto) -> list[Any] | None:
 # ---------------------------------------------------------------------------
 
 
-class OtslShapeInferenceEngine:
-    """Shape inference engine backed by OTSL operator specifications.
+class OtslNumericalShapeInferenceEngine:
+    """Numerical shape inference engine backed by OTSL operator specifications.
 
     Usage::
 
-        engine = OtslShapeInferenceEngine()
+        engine = OtslNumericalShapeInferenceEngine()
         inferred_model = engine.infer_shapes(model)
     """
 
@@ -2420,5 +2420,5 @@ def infer_shapes(model: ModelProto) -> ModelProto:
     """
     global _DEFAULT_ENGINE
     if _DEFAULT_ENGINE is None:
-        _DEFAULT_ENGINE = OtslShapeInferenceEngine()
+        _DEFAULT_ENGINE = OtslNumericalShapeInferenceEngine()
     return _DEFAULT_ENGINE.infer_shapes(model)

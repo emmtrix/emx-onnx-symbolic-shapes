@@ -5,7 +5,7 @@ Reference implementation for **OTSL - ONNX Type and Shape Language**, a declarat
 ## Overview
 
 This repository serves as the canonical reference implementation accompanying the OTSL RFC.
-The goal is to provide a portable, deterministic engine that can:
+The goal is to provide portable, deterministic inference engines that can:
 
 - parse OTSL shape rule definitions
 - propagate symbolic shapes through ONNX computation graphs
@@ -20,7 +20,7 @@ The full specification is available in [`docs/rfc-otsl.md`](docs/rfc-otsl.md).
 
 Early draft / prototype stage. See the RFC for design details and open questions.
 
-The current generated test status page is available at [`docs/test-engine-status.md`](docs/test-engine-status.md).
+The current generated numerical engine status page is available at [`docs/test-numerical-engine-status.md`](docs/test-numerical-engine-status.md).
 
 ## Contributing
 

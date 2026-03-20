@@ -1,10 +1,10 @@
-"""Generate expected comparison results for ``tests/test_engine.py``."""
+"""Generate expected comparison results for ``tests/test_numerical_engine.py``."""
 
 from __future__ import annotations
 
 import json
 
-from tests.official_engine_suite import (
+from tests.official_numerical_engine_suite import (
     EXPECTED_RESULTS_PATH,
     build_expected_results_document,
 )
