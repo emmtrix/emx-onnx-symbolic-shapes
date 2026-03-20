@@ -48,7 +48,9 @@ DimValue = int | str | None
 
 def _is_known_int(value: Any) -> bool:
     """Return ``True`` when *value* is a concrete integer dimension."""
-    return isinstance(value, int) and not isinstance(value, bool)
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (int, np.integer))
 
 
 def _to_shape(val: Any) -> list[DimValue]:
