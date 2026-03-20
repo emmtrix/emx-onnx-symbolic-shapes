@@ -58,22 +58,19 @@ def collect_official_test_cases() -> list[OfficialTestCase]:
     """Return the full official ONNX backend test suite from on-disk data."""
     cases: list[OfficialTestCase] = []
     for kind in OFFICIAL_TEST_KINDS:
-        loaded = sorted(load_model_tests(kind=kind), key=lambda case: case.name)
-        for case in loaded:
-            cases.append(
-                OfficialTestCase(
-                    case_id=f"{kind}::{case.name}",
-                    kind=kind,
-                    name=case.name,
-                    model_name=(
-                        Path(case.model_dir).name
-                        if case.model_dir is not None
-                        else case.model_name
-                    ),
-                    model_dir=case.model_dir,
-                    url=case.url,
-                )
-            )
+        for case in sorted(load_model_tests(kind=kind), key=lambda c: c.name):
+            cases.append(OfficialTestCase(
+                case_id=f"{kind}::{case.name}",
+                kind=kind,
+                name=case.name,
+                model_name=(
+                    Path(case.model_dir).name
+                    if case.model_dir is not None
+                    else case.model_name
+                ),
+                model_dir=case.model_dir,
+                url=case.url,
+            ))
     return cases
 
 
@@ -88,23 +85,17 @@ def build_case_expectations(
     expected_results: dict[str, Any],
 ) -> list[OfficialCaseExpectation]:
     """Pair each official test case with its expected comparison result."""
-    expectations: list[OfficialCaseExpectation] = []
     tests = expected_results["tests"]
-
+    expectations: list[OfficialCaseExpectation] = []
     for case in cases:
         if case.case_id not in tests:
             raise AssertionError(
                 f"Missing expected result entry for official test {case.case_id!r}"
             )
-        expectations.append(
-            OfficialCaseExpectation(
-                case=case,
-                expected_comparison_result=tests[case.case_id]["expected"][
-                    "comparison_result"
-                ],
-            )
-        )
-
+        expectations.append(OfficialCaseExpectation(
+            case=case,
+            expected_comparison_result=tests[case.case_id]["expected"]["comparison_result"],
+        ))
     return expectations
 
 
@@ -114,9 +105,8 @@ def render_status_page(document: dict[str, Any]) -> str:
     histogram: dict[str, int] = {}
     for entry in tests.values():
         result = entry["expected"]["comparison_result"]
-        if result == "OK":
-            continue
-        histogram[result] = histogram.get(result, 0) + 1
+        if result != "OK":
+            histogram[result] = histogram.get(result, 0) + 1
 
     lines = [
         "# Numerical Engine Status",
@@ -134,35 +124,22 @@ def render_status_page(document: dict[str, Any]) -> str:
     ]
 
     if histogram:
-        for result, count in sorted(
-            histogram.items(),
-            key=lambda item: (-item[1], item[0]),
-        ):
+        for result, count in sorted(histogram.items(), key=lambda item: (-item[1], item[0])):
             lines.append(f"| {count} | { _markdown_cell(result) } |")
     else:
         lines.append("| 0 | _No error results_ |")
 
-    lines.extend(
-        [
-            "",
-            "## Test Cases",
-            "",
-            "| Case ID | Result |",
-            "| --- | --- |",
-        ]
-    )
+    lines += [
+        "",
+        "## Test Cases",
+        "",
+        "| Case ID | Result |",
+        "| --- | --- |",
+    ]
 
     for case_id, entry in sorted(tests.items()):
-        lines.append(
-            "| "
-            + " | ".join(
-                [
-                    _markdown_cell(case_id),
-                    _markdown_cell(entry["expected"]["comparison_result"]),
-                ]
-            )
-            + " |"
-        )
+        cr = _markdown_cell(entry["expected"]["comparison_result"])
+        lines.append(f"| {_markdown_cell(case_id)} | {cr} |")
 
     return "\n".join(lines) + "\n"
 
@@ -202,18 +179,10 @@ def compare_case(case: OfficialTestCase) -> str:
     """Return ``OK`` or a deterministic error string for one official test."""
     try:
         model = _load_model(case)
-        input_values = _load_first_input_data_set(model, case)
-        enriched_model = _inject_constant_inputs(model, input_values)
-
-        onnx_inferred = shape_inference.infer_shapes(copy.deepcopy(enriched_model))
-        otsl_inferred = NUMERICAL_ENGINE.infer_shapes(enriched_model)
-
-        onnx_outputs = _get_output_signatures(onnx_inferred)
-        otsl_outputs = _get_output_signatures(otsl_inferred)
-        mismatch = _first_output_mismatch(onnx_outputs, otsl_outputs)
-        if mismatch is not None:
-            return mismatch
-        return "OK"
+        enriched_model = _inject_constant_inputs(model, _load_first_input_data_set(model, case))
+        onnx_outputs = _get_output_signatures(shape_inference.infer_shapes(copy.deepcopy(enriched_model)))
+        otsl_outputs = _get_output_signatures(NUMERICAL_ENGINE.infer_shapes(enriched_model))
+        return _first_output_mismatch(onnx_outputs, otsl_outputs) or "OK"
     except Exception as exc:  # noqa: BLE001
         return f"{type(exc).__name__}: {exc}"
 
@@ -222,12 +191,10 @@ def get_output_shapes(model: ModelProto) -> dict[str, list[int | str]]:
     """Extract tensor output shapes as ``{name: [dims]}``."""
     result: dict[str, list[int | str]] = {}
     for out in model.graph.output:
-        kind = out.type.WhichOneof("value")
-        if kind != "tensor_type":
-            continue
-        tp = out.type.tensor_type
-        if tp.HasField("shape"):
-            result[out.name] = [_dim_signature(dim) for dim in tp.shape.dim]
+        if out.type.WhichOneof("value") == "tensor_type":
+            tp = out.type.tensor_type
+            if tp.HasField("shape"):
+                result[out.name] = [_dim_signature(d) for d in tp.shape.dim]
     return result
 
 
@@ -243,8 +210,7 @@ def get_output_types(model: ModelProto) -> dict[str, int]:
 
 
 def _load_model(case: OfficialTestCase) -> ModelProto:
-    model_path = _resolve_model_path(case)
-    return onnx.load(model_path)
+    return onnx.load(_resolve_model_path(case))
 
 
 def _resolve_model_path(case: OfficialTestCase) -> Path:
@@ -332,9 +298,7 @@ def _inject_constant_inputs(
 
         if name in existing_init_names:
             continue
-        if arr.dtype.kind in ("i", "u"):
-            graph.initializer.append(numpy_helper.from_array(arr, name=name))
-        elif arr.dtype.kind == "f" and arr.size <= max_float_init_elems:
+        if arr.dtype.kind in ("i", "u") or (arr.dtype.kind == "f" and arr.size <= max_float_init_elems):
             graph.initializer.append(numpy_helper.from_array(arr, name=name))
 
     return model
@@ -363,10 +327,7 @@ def _first_output_mismatch(
 
 
 def _get_output_signatures(model: ModelProto) -> dict[str, dict[str, Any]]:
-    result: dict[str, dict[str, Any]] = {}
-    for out in model.graph.output:
-        result[out.name] = _type_signature(out.type)
-    return result
+    return {out.name: _type_signature(out.type) for out in model.graph.output}
 
 
 def _type_signature(type_proto: TypeProto) -> dict[str, Any]:
@@ -413,8 +374,4 @@ def _type_signature(type_proto: TypeProto) -> dict[str, Any]:
 
 
 def _dim_signature(dim: onnx.TensorShapeProto.Dimension) -> int | str:
-    if dim.HasField("dim_value"):
-        return int(dim.dim_value)
-    if dim.HasField("dim_param"):
-        return dim.dim_param
-    return "?"
+    return int(dim.dim_value) if dim.HasField("dim_value") else dim.dim_param if dim.HasField("dim_param") else "?"

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import math
+import operator
 from typing import Any
 
 import numpy as np
@@ -126,7 +127,6 @@ def _builtin_concat(args: list[Any]) -> list[int | None]:
     """``concat(s1, s2)`` - concatenate two shapes."""
     s1, s2 = args
     return _to_shape(s1) + _to_shape(s2)
-
 
 
 def _builtin_concat_shape(args: list[Any]) -> list[int | None]:
@@ -306,14 +306,8 @@ def _builtin_unsqueeze_shape(args: list[Any]) -> list[int | None]:
 
 def _builtin_prod(args: list[Any]) -> int | None:
     """``prod(shape)`` - product of dimension values."""
-    (vals,) = args
-    vals = _to_shape(vals)
-    result = 1
-    for v in vals:
-        if v is None:
-            return None
-        result *= v
-    return result
+    vals = _to_shape(args[0])
+    return None if any(v is None for v in vals) else math.prod(vals)
 
 
 def _builtin_subshape(args: list[Any]) -> list[int | None]:
@@ -539,9 +533,7 @@ def _builtin_pool_shape(args: list[Any]) -> list[int | None]:
 
         effective_k = (k - 1) * dil + 1
 
-        if isinstance(auto_pad, str) and auto_pad == "SAME_UPPER":
-            out = math.ceil(d / s)
-        elif isinstance(auto_pad, str) and auto_pad == "SAME_LOWER":
+        if isinstance(auto_pad, str) and auto_pad in ("SAME_UPPER", "SAME_LOWER"):
             out = math.ceil(d / s)
         elif isinstance(auto_pad, str) and auto_pad == "VALID":
             out = math.ceil((d - effective_k + 1) / s)
@@ -1118,26 +1110,30 @@ def _eval_expr(expr: Expr, env: _EvalEnv) -> Any:
 
 def _eval_binop(op: str, left: Any, right: Any) -> Any:
     """Evaluate a binary operation."""
-    ops = {
-        "+": lambda a, b: a + b,
-        "-": lambda a, b: a - b,
-        "*": lambda a, b: a * b,
-        "floordiv": lambda a, b: a // b,
-        "ceildiv": lambda a, b: math.ceil(a / b),
-        "==": lambda a, b: a == b,
-        "!=": lambda a, b: a != b,
-        "<": lambda a, b: a < b,
-        ">": lambda a, b: a > b,
-        "<=": lambda a, b: a <= b,
-        ">=": lambda a, b: a >= b,
-        "and": lambda a, b: a and b,
-        "or": lambda a, b: a or b,
-        "max": lambda a, b: max(a, b),
-        "min": lambda a, b: min(a, b),
-    }
-    if op not in ops:
+    fn = _BINOP_DISPATCH.get(op)
+    if fn is None:
         raise ValueError(f"Unsupported binary operator: {op!r}")
-    return ops[op](left, right)
+    return fn(left, right)
+
+
+# Hoisted dispatch table for binary operations (avoids per-call dict creation).
+_BINOP_DISPATCH: dict[str, Any] = {
+    "+": operator.add,
+    "-": operator.sub,
+    "*": operator.mul,
+    "floordiv": operator.floordiv,
+    "ceildiv": lambda a, b: math.ceil(a / b),
+    "==": operator.eq,
+    "!=": operator.ne,
+    "<": operator.lt,
+    ">": operator.gt,
+    "<=": operator.le,
+    ">=": operator.ge,
+    "and": lambda a, b: a and b,
+    "or": lambda a, b: a or b,
+    "max": max,
+    "min": min,
+}
 
 
 def _eval_type_func(arg: Expr, env: _EvalEnv) -> int:
@@ -1341,54 +1337,10 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     """Evaluate a function call."""
     name = call.name
 
-    # type() needs special handling: resolve element type, not shape
-    if name == "type":
-        return _eval_type_func(call.args[0], env)
-
-    if name == "full_type":
-        return _eval_full_type_func(call.args[0], env)
-
-    if name == "unwrap_optional_type":
-        return _eval_unwrap_optional_type_func(call, env)
-
-    if name == "if_output_types":
-        return _eval_if_output_types_func(env)
-
-    if name == "loop_output_types":
-        return _eval_loop_output_types_func(env)
-
-    if name == "output_count":
-        return _eval_output_count_func(env)
-
-    if name == "attribute":
-        return _eval_attribute_func(call, env)
-
-    if name == "input_type":
-        return _eval_input_type_func(call, env)
-
-    if name == "tensor_attribute_type":
-        return _eval_tensor_attribute_type_func(call, env)
-
-    if name == "tensor_attribute_shape":
-        return _eval_tensor_attribute_shape_func(call, env)
-
-    if name == "tensor_attribute_values":
-        return _eval_tensor_attribute_values_func(call, env)
-
-    if name == "attribute_value_type":
-        return _eval_attribute_value_type_func(call, env)
-
-    if name == "attribute_value_shape":
-        return _eval_attribute_value_shape_func(call, env)
-
-    if name == "attribute_values":
-        return _eval_attribute_values_func(call, env)
-
-    if name == "sequence_elem_shape":
-        return _eval_sequence_elem_shape_func(call, env)
-
-    if name == "sequence_elem_type":
-        return _eval_sequence_elem_type_func(call, env)
+    # Env-dependent special dispatch (these access env directly, not just args)
+    special = _SPECIAL_FUNC_DISPATCH.get(name)
+    if special is not None:
+        return special(call, env)
 
     # shape_value needs special handling: resolve tensor values, not shape
     if name == "shape_value":
@@ -1405,8 +1357,7 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
     if name == "resolve_reshape":
         args = [_eval_expr(a, env) for a in call.args]
         if len(args) < 3:
-            allowzero = env.attributes.get("allowzero", 0)
-            args.append(allowzero)
+            args.append(env.attributes.get("allowzero", 0))
         return _BUILTINS[name](args)
 
     # Regular built-in dispatch
@@ -1415,6 +1366,27 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
         return _BUILTINS[name](args)
 
     raise NameError(f"Unknown function: {name!r}")
+
+
+# Dispatch table for env-dependent special functions (avoids long if-chain).
+_SPECIAL_FUNC_DISPATCH: dict[str, Any] = {
+    "type": lambda call, env: _eval_type_func(call.args[0], env),
+    "full_type": lambda call, env: _eval_full_type_func(call.args[0], env),
+    "unwrap_optional_type": _eval_unwrap_optional_type_func,
+    "if_output_types": lambda call, env: _eval_if_output_types_func(env),
+    "loop_output_types": lambda call, env: _eval_loop_output_types_func(env),
+    "output_count": lambda call, env: _eval_output_count_func(env),
+    "attribute": _eval_attribute_func,
+    "input_type": _eval_input_type_func,
+    "tensor_attribute_type": _eval_tensor_attribute_type_func,
+    "tensor_attribute_shape": _eval_tensor_attribute_shape_func,
+    "tensor_attribute_values": _eval_tensor_attribute_values_func,
+    "attribute_value_type": _eval_attribute_value_type_func,
+    "attribute_value_shape": _eval_attribute_value_shape_func,
+    "attribute_values": _eval_attribute_values_func,
+    "sequence_elem_shape": _eval_sequence_elem_shape_func,
+    "sequence_elem_type": _eval_sequence_elem_type_func,
+}
 
 
 
@@ -1769,40 +1741,32 @@ def _broadcast_values(left: list[Any], right: list[Any]) -> tuple[list[Any], lis
     raise ValueError("incompatible flattened tensor lengths")
 
 
+_ELEMENTWISE_OPS: dict[str, Any] = {
+    "Add": operator.add,
+    "Sub": operator.sub,
+    "Mul": operator.mul,
+    "Div": lambda a, b: a // b if isinstance(a, int) and isinstance(b, int) else a / b,
+    "Max": max,
+    "Min": min,
+}
+
+
 def _elementwise_values(
     left: list[Any],
     right: list[Any],
     op: str,
 ) -> list[Any]:
     """Apply a simple elementwise operation to flattened tensors."""
+    fn = _ELEMENTWISE_OPS.get(op)
+    if fn is None:
+        raise ValueError(f"unsupported op {op!r}")
     left, right = _broadcast_values(left, right)
-    result: list[Any] = []
-    for a, b in zip(left, right):
-        if op == "Add":
-            result.append(a + b)
-        elif op == "Sub":
-            result.append(a - b)
-        elif op == "Mul":
-            result.append(a * b)
-        elif op == "Div":
-            if isinstance(a, int) and isinstance(b, int):
-                result.append(a // b)
-            else:
-                result.append(a / b)
-        elif op == "Max":
-            result.append(max(a, b))
-        elif op == "Min":
-            result.append(min(a, b))
-        else:
-            raise ValueError(f"unsupported op {op!r}")
-    return result
+    return [fn(a, b) for a, b in zip(left, right)]
 
 
 def _shape_tensor_values(shape: list[DimValue]) -> list[int] | None:
     """Convert a fully known shape into a concrete shape-tensor payload."""
-    if any(not _is_known_int(dim) for dim in shape):
-        return None
-    return [int(dim) for dim in shape]
+    return None if any(not _is_known_int(d) for d in shape) else [int(d) for d in shape]
 
 
 def _infer_tensor_value_output(
@@ -1851,7 +1815,7 @@ def _infer_tensor_value_output(
                 result.append(data[index])
             return result
 
-    if op_type in {"Add", "Sub", "Mul", "Div", "Max", "Min"} and len(node.input) >= 2:
+    if op_type in _ELEMENTWISE_OPS and len(node.input) >= 2:
         left_name, right_name = node.input[:2]
         if left_name in known_tensor_values and right_name in known_tensor_values:
             return _elementwise_values(
@@ -1898,49 +1862,48 @@ def _infer_tensor_value_output(
 
 def _get_attribute_value(attr: onnx.AttributeProto) -> Any:
     """Extract a Python value from an ONNX AttributeProto."""
-    if attr.type == onnx.AttributeProto.INT:
+    _atype = attr.type
+    if _atype == onnx.AttributeProto.INT:
         return attr.i
-    if attr.type == onnx.AttributeProto.INTS:
+    if _atype == onnx.AttributeProto.INTS:
         return list(attr.ints)
-    if attr.type == onnx.AttributeProto.FLOAT:
+    if _atype == onnx.AttributeProto.FLOAT:
         return attr.f
-    if attr.type == onnx.AttributeProto.FLOATS:
+    if _atype == onnx.AttributeProto.FLOATS:
         return list(attr.floats)
-    if attr.type == onnx.AttributeProto.STRING:
+    if _atype == onnx.AttributeProto.STRING:
         return attr.s.decode("utf-8")
-    if attr.type == onnx.AttributeProto.STRINGS:
+    if _atype == onnx.AttributeProto.STRINGS:
         return [s.decode("utf-8") for s in attr.strings]
     return None
 
 
 def _get_attribute_value_shape(attr: onnx.AttributeProto) -> list[int | None] | None:
     """Return the tensor-like shape of an ONNX attribute value."""
-    if attr.type == onnx.AttributeProto.TENSOR:
+    _atype = attr.type
+    if _atype == onnx.AttributeProto.TENSOR:
         return list(attr.t.dims)
-    if attr.type in (
-        onnx.AttributeProto.INT,
-        onnx.AttributeProto.FLOAT,
-        onnx.AttributeProto.STRING,
-    ):
+    if _atype in (onnx.AttributeProto.INT, onnx.AttributeProto.FLOAT, onnx.AttributeProto.STRING):
         return []
-    if attr.type == onnx.AttributeProto.INTS:
+    if _atype == onnx.AttributeProto.INTS:
         return [len(attr.ints)]
-    if attr.type == onnx.AttributeProto.FLOATS:
+    if _atype == onnx.AttributeProto.FLOATS:
         return [len(attr.floats)]
-    if attr.type == onnx.AttributeProto.STRINGS:
+    if _atype == onnx.AttributeProto.STRINGS:
         return [len(attr.strings)]
     return None
 
 
 def _get_attribute_value_type(attr: onnx.AttributeProto) -> int:
     """Return the tensor element type represented by an ONNX attribute value."""
-    if attr.type == onnx.AttributeProto.TENSOR:
+    _atype = attr.type
+    if _atype == onnx.AttributeProto.TENSOR:
         return attr.t.data_type
-    if attr.type in (onnx.AttributeProto.INT, onnx.AttributeProto.INTS):
+    if _atype in (onnx.AttributeProto.INT, onnx.AttributeProto.INTS):
         return TensorProto.INT64
-    if attr.type in (onnx.AttributeProto.FLOAT, onnx.AttributeProto.FLOATS):
+    if _atype in (onnx.AttributeProto.FLOAT, onnx.AttributeProto.FLOATS):
         return TensorProto.FLOAT
-    if attr.type in (onnx.AttributeProto.STRING, onnx.AttributeProto.STRINGS):
+    if _atype in (onnx.AttributeProto.STRING, onnx.AttributeProto.STRINGS):
         return TensorProto.STRING
     return TensorProto.UNDEFINED
 

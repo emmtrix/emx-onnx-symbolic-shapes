@@ -31,7 +31,7 @@ def load_all_specs() -> dict[str, ShapeSpec]:
     Returns a mapping from operator name (stem of the filename) to the
     parsed :class:`ShapeSpec`.
     """
-    specs: dict[str, ShapeSpec] = {}
-    for path in sorted(_SPECS_DIR.glob("*.otsl")):
-        specs[path.stem] = parse(path.read_text(encoding="utf-8"))
-    return specs
+    return {
+        p.stem: parse(p.read_text(encoding="utf-8"))
+        for p in sorted(_SPECS_DIR.glob("*.otsl"))
+    }

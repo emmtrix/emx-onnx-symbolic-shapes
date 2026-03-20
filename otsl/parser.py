@@ -1,4 +1,4 @@
-"""Recursiveâ€‘descent parser for OTSL textual syntax."""
+"""Recursive-descent parser for OTSL textual syntax."""
 
 from __future__ import annotations
 
@@ -24,6 +24,13 @@ from .lexer import Token, TokenType, tokenize
 
 __all__ = ["ParseError", "parse"]
 
+# Comparison token -> operator string (hoisted to module level).
+_CMP_OPS: dict[TokenType, str] = {
+    TokenType.EQ: "==", TokenType.NEQ: "!=",
+    TokenType.LT: "<", TokenType.GT: ">",
+    TokenType.LTE: "<=", TokenType.GTE: ">=",
+}
+
 
 class ParseError(Exception):
     """Raised when the parser encounters unexpected input."""
@@ -35,7 +42,7 @@ class ParseError(Exception):
 
 
 class _Parser:
-    """Internal recursiveâ€‘descent parser state."""
+    """Internal recursive-descent parser state."""
 
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
@@ -49,13 +56,10 @@ class _Parser:
         return self.tokens[self.pos]
 
     def _peek(self, tt: TokenType) -> bool:
-        return self._cur().type == tt
-
-    def _at_keyword(self, kw: TokenType) -> bool:
-        return self._cur().type == kw
+        return self.tokens[self.pos].type == tt
 
     def _expect(self, tt: TokenType) -> Token:
-        tok = self._cur()
+        tok = self.tokens[self.pos]
         if tok.type != tt:
             raise ParseError(
                 f"Expected {tt.name}, got {tok.type.name} ({tok.value!r})",
@@ -66,7 +70,7 @@ class _Parser:
         return tok
 
     def _advance(self) -> Token:
-        tok = self._cur()
+        tok = self.tokens[self.pos]
         self.pos += 1
         return tok
 
@@ -83,15 +87,13 @@ class _Parser:
         attributes: list[str] = []
         statements: list[Statement] = []
 
-        # Declarations first, then statements.  We allow them in any order,
-        # but declarations are separated from general statements by type.
         while not self._peek(TokenType.RBRACE) and not self._peek(TokenType.EOF):
-            if self._at_keyword(TokenType.INPUTS):
+            if self._peek(TokenType.INPUTS):
                 inputs.extend(self._parse_input_decl())
-            elif self._at_keyword(TokenType.OUTPUTS):
-                outputs.extend(self._parse_output_decl())
-            elif self._at_keyword(TokenType.ATTRIBUTES):
-                attributes.extend(self._parse_attr_decl())
+            elif self._peek(TokenType.OUTPUTS):
+                outputs.extend(self._parse_name_list(TokenType.OUTPUTS))
+            elif self._peek(TokenType.ATTRIBUTES):
+                attributes.extend(self._parse_name_list(TokenType.ATTRIBUTES))
             else:
                 statements.append(self._parse_statement())
 
@@ -122,20 +124,10 @@ class _Parser:
             variadic = True
         return InputDecl(name_tok.value, variadic)
 
-    def _parse_output_decl(self) -> list[str]:
-        self._expect(TokenType.OUTPUTS)
-        names: list[str] = []
-        names.append(self._expect(TokenType.IDENT).value)
-        while self._peek(TokenType.COMMA):
-            self._advance()
-            names.append(self._expect(TokenType.IDENT).value)
-        self._expect(TokenType.SEMICOLON)
-        return names
-
-    def _parse_attr_decl(self) -> list[str]:
-        self._expect(TokenType.ATTRIBUTES)
-        names: list[str] = []
-        names.append(self._expect(TokenType.IDENT).value)
+    def _parse_name_list(self, keyword: TokenType) -> list[str]:
+        """Parse ``keyword name, name, ...; `` (used for outputs and attributes)."""
+        self._expect(keyword)
+        names = [self._expect(TokenType.IDENT).value]
         while self._peek(TokenType.COMMA):
             self._advance()
             names.append(self._expect(TokenType.IDENT).value)
@@ -193,35 +185,24 @@ class _Parser:
 
     def _parse_or(self) -> Expr:
         left = self._parse_and()
-        while self._at_keyword(TokenType.OR):
+        while self._peek(TokenType.OR):
             self._advance()
-            right = self._parse_and()
-            left = BinOp("or", left, right)
+            left = BinOp("or", left, self._parse_and())
         return left
 
     def _parse_and(self) -> Expr:
         left = self._parse_comparison()
-        while self._at_keyword(TokenType.AND):
+        while self._peek(TokenType.AND):
             self._advance()
-            right = self._parse_comparison()
-            left = BinOp("and", left, right)
+            left = BinOp("and", left, self._parse_comparison())
         return left
 
     def _parse_comparison(self) -> Expr:
         left = self._parse_add()
-        op_map = {
-            TokenType.EQ: "==",
-            TokenType.NEQ: "!=",
-            TokenType.LT: "<",
-            TokenType.GT: ">",
-            TokenType.LTE: "<=",
-            TokenType.GTE: ">=",
-        }
-        if self._cur().type in op_map:
-            op = op_map[self._cur().type]
+        op = _CMP_OPS.get(self._cur().type)
+        if op is not None:
             self._advance()
-            right = self._parse_add()
-            left = BinOp(op, left, right)
+            left = BinOp(op, left, self._parse_add())
         return left
 
     def _parse_add(self) -> Expr:
@@ -229,16 +210,14 @@ class _Parser:
         while self._cur().type in (TokenType.PLUS, TokenType.MINUS):
             op = "+" if self._cur().type == TokenType.PLUS else "-"
             self._advance()
-            right = self._parse_mul()
-            left = BinOp(op, left, right)
+            left = BinOp(op, left, self._parse_mul())
         return left
 
     def _parse_mul(self) -> Expr:
         left = self._parse_primary()
-        while self._cur().type == TokenType.STAR:
+        while self._peek(TokenType.STAR):
             self._advance()
-            right = self._parse_primary()
-            left = BinOp("*", left, right)
+            left = BinOp("*", left, self._parse_primary())
         return left
 
     # -----------------------------------------------------------------
@@ -248,37 +227,30 @@ class _Parser:
     def _parse_primary(self) -> Expr:
         tok = self._cur()
 
-        # Number
         if tok.type == TokenType.NUMBER:
             self._advance()
             return NumberLit(int(tok.value))
 
-        # Unknown dimension
         if tok.type == TokenType.QUESTION:
             self._advance()
             return UnknownDim()
 
-        # String literal
         if tok.type == TokenType.STRING:
             self._advance()
             return StringLit(tok.value)
 
-        # Shape literal  [expr, ...]
         if tok.type == TokenType.LBRACKET:
             return self._parse_shape_literal()
 
-        # Parenthesised expression
         if tok.type == TokenType.LPAREN:
             self._advance()
             expr = self._parse_expr()
             self._expect(TokenType.RPAREN)
             return expr
 
-        # if / then / else
         if tok.type == TokenType.IF:
             return self._parse_if_expr()
 
-        # Identifier-led: plain ident, function call, or index access
         if tok.type == TokenType.IDENT:
             return self._parse_ident_expr()
 
@@ -305,14 +277,12 @@ class _Parser:
         self._expect(TokenType.THEN)
         then_expr = self._parse_expr()
         self._expect(TokenType.ELSE)
-        else_expr = self._parse_expr()
-        return IfExpr(cond, then_expr, else_expr)
+        return IfExpr(cond, then_expr, self._parse_expr())
 
     def _parse_ident_expr(self) -> Expr:
-        name_tok = self._expect(TokenType.IDENT)
-        name = name_tok.value
+        name = self._expect(TokenType.IDENT).value
 
-        # Function call: IDENT '(' ... ')'
+        # Function call: IDENT \'(\' ... \')\'
         if self._peek(TokenType.LPAREN):
             self._advance()
             args: list[Expr] = []
@@ -324,7 +294,7 @@ class _Parser:
             self._expect(TokenType.RPAREN)
             return FuncCall(name, args)
 
-        # Index access: IDENT '[' expr ']'
+        # Index access: IDENT \'[\' expr \']\' 
         if self._peek(TokenType.LBRACKET):
             self._advance()
             index = self._parse_expr()
