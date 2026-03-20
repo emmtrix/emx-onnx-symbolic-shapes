@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.official_engine_suite import (
+from tests.official_numerical_engine_suite import (
     STATUS_PAGE_PATH,
     load_expected_results,
     render_status_page,

@@ -1,4 +1,4 @@
-"""Tests for the OTSL shape inference engine."""
+"""Tests for the OTSL numerical shape inference engine."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 from onnx import ModelProto, TensorProto, helper, numpy_helper
 
-from otsl.engine import infer_shapes as otsl_infer_shapes
-from tests.official_engine_suite import (
+from otsl.numerical_engine import infer_shapes as otsl_infer_shapes
+from tests.official_numerical_engine_suite import (
     EXPECTED_RESULTS_PATH,
     OfficialCaseExpectation,
     build_case_expectations,
@@ -45,7 +45,7 @@ def test_expected_results_cover_all_official_cases() -> None:
 
 
 @pytest.mark.parametrize("expectation", _OFFICIAL_CASE_PARAMS)
-def test_otsl_vs_onnx(expectation: OfficialCaseExpectation) -> None:
+def test_otsl_numerical_vs_onnx(expectation: OfficialCaseExpectation) -> None:
     actual_result = compare_case(expectation.case)
     assert actual_result == expectation.expected_comparison_result, (
         f"{expectation.case.case_id}: "
@@ -55,12 +55,12 @@ def test_otsl_vs_onnx(expectation: OfficialCaseExpectation) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Direct engine unit tests (no ONNX test-case dependency)
+# Direct numerical engine unit tests (no ONNX test-case dependency)
 # ---------------------------------------------------------------------------
 
 
-class TestEngineBasic:
-    """Unit tests for the OTSL engine on hand-crafted models."""
+class TestNumericalEngineBasic:
+    """Unit tests for the OTSL numerical engine on hand-crafted models."""
 
     @staticmethod
     def _simple_model(
