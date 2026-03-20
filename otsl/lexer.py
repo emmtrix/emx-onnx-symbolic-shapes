@@ -97,6 +97,35 @@ _NEG_NUM_PREDECESSORS = frozenset({
     TokenType.OR,
 })
 
+# Two-character operator lookup (hoisted to module level).
+_TWO_CHAR_OPS: dict[str, TokenType] = {
+    "==": TokenType.EQ,
+    "!=": TokenType.NEQ,
+    "<=": TokenType.LTE,
+    ">=": TokenType.GTE,
+}
+
+# Single-character token lookup (hoisted to module level).
+_SINGLE_CHAR: dict[str, TokenType] = {
+    "{": TokenType.LBRACE,
+    "}": TokenType.RBRACE,
+    "(": TokenType.LPAREN,
+    ")": TokenType.RPAREN,
+    "[": TokenType.LBRACKET,
+    "]": TokenType.RBRACKET,
+    ";": TokenType.SEMICOLON,
+    ",": TokenType.COMMA,
+    ":": TokenType.COLON,
+    ".": TokenType.DOT,
+    "=": TokenType.ASSIGN,
+    "+": TokenType.PLUS,
+    "-": TokenType.MINUS,
+    "*": TokenType.STAR,
+    "?": TokenType.QUESTION,
+    "<": TokenType.LT,
+    ">": TokenType.GT,
+}
+
 
 @dataclass(slots=True)
 class Token:
@@ -126,10 +155,6 @@ def tokenize(source: str) -> list[Token]:
     col = 1
     length = len(source)
 
-    def _peek(offset: int = 0) -> str:
-        pos = i + offset
-        return source[pos] if pos < length else ""
-
     while i < length:
         ch = source[i]
 
@@ -145,7 +170,7 @@ def tokenize(source: str) -> list[Token]:
             continue
 
         # --- comments (# or //) ---
-        if ch == "#" or (ch == "/" and _peek(1) == "/"):
+        if ch == "#" or (ch == "/" and i + 1 < length and source[i + 1] == "/"):
             while i < length and source[i] != "\n":
                 i += 1
             continue
@@ -161,8 +186,7 @@ def tokenize(source: str) -> list[Token]:
                 j += 1
             if j >= length:
                 raise LexError("Unterminated string literal", line, start_col)
-            value = source[i + 1 : j]
-            tokens.append(Token(TokenType.STRING, value, line, start_col))
+            tokens.append(Token(TokenType.STRING, source[i + 1 : j], line, start_col))
             col += j - i + 1
             i = j + 1
             continue
@@ -172,21 +196,19 @@ def tokenize(source: str) -> list[Token]:
             j = i
             while j < length and source[j].isdigit():
                 j += 1
-            value = source[i:j]
-            tokens.append(Token(TokenType.NUMBER, value, line, start_col))
+            tokens.append(Token(TokenType.NUMBER, source[i:j], line, start_col))
             col += j - i
             i = j
             continue
 
         # --- negative number (context-sensitive) ---
-        if ch == "-" and _peek(1).isdigit():
+        if ch == "-" and i + 1 < length and source[i + 1].isdigit():
             prev_type = tokens[-1].type if tokens else None
             if prev_type is None or prev_type in _NEG_NUM_PREDECESSORS:
                 j = i + 1
                 while j < length and source[j].isdigit():
                     j += 1
-                value = source[i:j]
-                tokens.append(Token(TokenType.NUMBER, value, line, start_col))
+                tokens.append(Token(TokenType.NUMBER, source[i:j], line, start_col))
                 col += j - i
                 i = j
                 continue
@@ -197,57 +219,25 @@ def tokenize(source: str) -> list[Token]:
             while j < length and (source[j].isalnum() or source[j] == "_"):
                 j += 1
             word = source[i:j]
-            tt = _KEYWORDS.get(word, TokenType.IDENT)
-            tokens.append(Token(tt, word, line, start_col))
+            tokens.append(Token(_KEYWORDS.get(word, TokenType.IDENT), word, line, start_col))
             col += j - i
             i = j
             continue
 
         # --- two-character operators ---
-        two = source[i : i + 2] if i + 1 < length else ""
-        if two == "==":
-            tokens.append(Token(TokenType.EQ, "==", line, start_col))
-            i += 2
-            col += 2
-            continue
-        if two == "!=":
-            tokens.append(Token(TokenType.NEQ, "!=", line, start_col))
-            i += 2
-            col += 2
-            continue
-        if two == "<=":
-            tokens.append(Token(TokenType.LTE, "<=", line, start_col))
-            i += 2
-            col += 2
-            continue
-        if two == ">=":
-            tokens.append(Token(TokenType.GTE, ">=", line, start_col))
-            i += 2
-            col += 2
-            continue
+        if i + 1 < length:
+            two = source[i : i + 2]
+            tt = _TWO_CHAR_OPS.get(two)
+            if tt is not None:
+                tokens.append(Token(tt, two, line, start_col))
+                i += 2
+                col += 2
+                continue
 
         # --- single-character tokens ---
-        singles: dict[str, TokenType] = {
-            "{": TokenType.LBRACE,
-            "}": TokenType.RBRACE,
-            "(": TokenType.LPAREN,
-            ")": TokenType.RPAREN,
-            "[": TokenType.LBRACKET,
-            "]": TokenType.RBRACKET,
-            ";": TokenType.SEMICOLON,
-            ",": TokenType.COMMA,
-            ":": TokenType.COLON,
-            ".": TokenType.DOT,
-            "=": TokenType.ASSIGN,
-            "+": TokenType.PLUS,
-            "-": TokenType.MINUS,
-            "*": TokenType.STAR,
-            "?": TokenType.QUESTION,
-            "<": TokenType.LT,
-            ">": TokenType.GT,
-        }
-        if ch in singles:
-            tokens.append(Token(singles[ch], ch, line, start_col))
+        tt = _SINGLE_CHAR.get(ch)
+        if tt is not None:
+            tokens.append(Token(tt, ch, line, start_col))
             i += 1
             col += 1
             continue
