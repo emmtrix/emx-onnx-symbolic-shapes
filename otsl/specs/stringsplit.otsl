@@ -1,4 +1,9 @@
 rules {
   inputs x;
   outputs substrings, length;
+
+  result substrings.shape = concat(shape(x), [?]);
+  result substrings.type = string;
+  result length.shape = shape(x);
+  result length.type = int64;
 }

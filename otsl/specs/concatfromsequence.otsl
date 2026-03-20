@@ -1,4 +1,17 @@
 rules {
   inputs input_sequence;
   outputs output;
+  attributes axis, new_axis;
+
+  let elem = sequence_elem_shape(input_sequence);
+  let ax =
+    if attribute("new_axis", 0) != 0
+    then normalize_axis(attribute("axis", 0), rank(elem) + 1)
+    else normalize_axis(attribute("axis", 0), rank(elem));
+
+  result output.shape =
+    if attribute("new_axis", 0) != 0
+    then concat(prefix(elem, ax), concat([?], suffix(elem, ax)))
+    else concat(prefix(elem, ax), concat([?], suffix(elem, ax + 1)));
+  result output.type = sequence_elem_type(input_sequence, float);
 }

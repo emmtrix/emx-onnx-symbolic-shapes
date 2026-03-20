@@ -1,4 +1,6 @@
 rules {
-  inputs;
+  inputs Xs[];
   outputs output_sequence;
+
+  result output_sequence.onnx_type = sequence_type(shape(Xs[0]), type(Xs[0]));
 }
