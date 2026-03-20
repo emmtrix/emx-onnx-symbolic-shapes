@@ -321,6 +321,9 @@ def _inject_constant_inputs(
         arr = input_arrays[idx]
         name = inp.name
 
+        if inp.type.HasField("optional_type"):
+            continue
+
         if isinstance(arr, np.generic) and not isinstance(arr, np.ndarray):
             arr = np.array(arr)
 
