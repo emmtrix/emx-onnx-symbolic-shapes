@@ -27,7 +27,7 @@ EXPECTED_RESULTS_PATH = (
     Path(__file__).resolve().parent / "data" / "test_numerical_engine_expected.json"
 )
 STATUS_PAGE_PATH = (
-    Path(__file__).resolve().parent.parent / "docs" / "test-numerical-engine-status.md"
+    Path(__file__).resolve().parent.parent / "docs" / "test-engine-status.md"
 )
 
 

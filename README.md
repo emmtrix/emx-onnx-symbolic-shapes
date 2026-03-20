@@ -20,7 +20,7 @@ The full specification is available in [`docs/rfc-otsl.md`](docs/rfc-otsl.md).
 
 Early draft / prototype stage. See the RFC for design details and open questions.
 
-The current generated numerical engine status page is available at [`docs/test-numerical-engine-status.md`](docs/test-numerical-engine-status.md).
+The current generated numerical engine status page is available at [`docs/test-engine-status.md`](docs/test-engine-status.md).
 
 ## Contributing
 
