@@ -5,6 +5,7 @@ from .parser import parse
 
 __all__ = ["parse", "load_spec", "load_all_specs"]
 
-# The numerical engine is importable but not auto-loaded to avoid onnx/numpy
+# The engines are importable but not auto-loaded to avoid onnx/numpy
 # dependency for pure parsing use cases. Use:
 # ``from otsl.numerical_engine import infer_shapes``
+# ``from otsl.numpy_engine import infer_shapes``
