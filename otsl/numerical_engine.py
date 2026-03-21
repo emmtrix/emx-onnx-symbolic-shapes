@@ -68,6 +68,12 @@ def _builtin_dim(args: list[Any]) -> DimValue:
     """``dim(X, i)`` - return dimension *i* (supports negative indexing)."""
     shape, idx = args
     shape = _to_shape(shape)
+    idx = int(idx)
+    rank = len(shape)
+    if idx < 0:
+        idx += rank
+    if idx < 0 or idx >= rank:
+        raise ValueError(f"dim index {idx} out of bounds for rank {rank}")
     return shape[idx]
 
 
@@ -136,21 +142,35 @@ def _builtin_concat_shape(args: list[Any]) -> list[int | None]:
         raise ValueError("concat_shape requires at least one input")
     first = _to_shape(inputs[0])
     r = len(first)
-    if axis < 0:
-        axis += r
+    axis = _builtin_normalize_axis([axis, r])
+    input_shapes = [first] + [_to_shape(inp) for inp in inputs[1:]]
+    for shape in input_shapes[1:]:
+        if len(shape) != r:
+            raise ValueError(
+                f"concat_shape rank mismatch: expected rank {r}, got {len(shape)}"
+            )
     result: list[int | None] = []
     for j in range(r):
         if j == axis:
             total: int | None = 0
-            for inp in inputs:
-                d = _to_shape(inp)[j]
-                if d is None or total is None:
+            for shape in input_shapes:
+                d = shape[j]
+                if not _is_known_int(d) or total is None:
                     total = None
                 else:
                     total += d
             result.append(total)
         else:
-            result.append(first[j])
+            ref = first[j]
+            for shape in input_shapes[1:]:
+                current = shape[j]
+                if _is_known_int(ref) and _is_known_int(current) and ref != current:
+                    raise ValueError(
+                        f"concat_shape mismatch at axis {j}: {ref} vs {current}"
+                    )
+                if ref is None and current is not None:
+                    ref = current
+            result.append(ref)
     return result
 
 
@@ -165,9 +185,15 @@ def _builtin_permute(args: list[Any]) -> list[int | None]:
 def _builtin_normalize_axis(args: list[Any]) -> int:
     """``normalize_axis(axis, rank)`` - handle negative axis values."""
     axis, rank = args
-    if axis < 0:
-        axis += rank
-    return axis
+    axis = int(axis)
+    rank = int(rank)
+    if rank == 0:
+        raise ValueError("normalize_axis requires rank > 0")
+    if 0 <= axis < rank:
+        return axis
+    if -rank <= axis < 0:
+        return axis + rank
+    raise ValueError(f"axis {axis} out of range for rank {rank}")
 
 
 def _builtin_reverse_perm(args: list[Any]) -> list[int]:
@@ -243,17 +269,31 @@ def _builtin_resolve_reshape(args: list[Any]) -> list[int | None]:
     input_shape = _to_shape(args[0])
     target = list(args[1])
     allowzero = args[2] if len(args) > 2 else 0
+    if allowzero not in (0, 1):
+        raise ValueError("allowzero must be 0 or 1")
 
     # Handle 0s: copy dimension from input (unless allowzero)
     result = []
+    neg_idx = None
     for i, t in enumerate(target):
-        if t == 0 and not allowzero and i < len(input_shape):
+        if t == -1:
+            if neg_idx is not None:
+                raise ValueError("reshape target may contain at most one -1")
+            neg_idx = i
+            result.append(t)
+        elif t == 0 and not allowzero and i < len(input_shape):
             result.append(input_shape[i])
+        elif t == 0 and not allowzero:
+            raise ValueError(
+                "reshape target copies an input dimension that does not exist"
+            )
+        elif _is_known_int(t) and t < -1:
+            raise ValueError("reshape target dimensions must be >= -1")
         else:
             result.append(t)
 
     # Handle -1: infer from total
-    if -1 in result:
+    if neg_idx is not None:
         known_total = 1
         for d in input_shape:
             if d is None:
@@ -263,20 +303,37 @@ def _builtin_resolve_reshape(args: list[Any]) -> list[int | None]:
 
         if known_total is not None:
             known_output = 1
-            neg_idx = -1
             for i, d in enumerate(result):
                 if d == -1:
-                    neg_idx = i
+                    continue
                 elif d is None:
                     known_output = None
                     break
                 else:
                     known_output *= d
 
-            if known_output is not None and known_output != 0 and neg_idx >= 0:
+            if known_output is not None and known_output > 0:
+                if known_total % known_output != 0:
+                    raise ValueError("reshape total element count is inconsistent")
                 result[neg_idx] = known_total // known_output
-            elif neg_idx >= 0:
+            else:
                 result[neg_idx] = None
+    else:
+        known_total = 1
+        for d in input_shape:
+            if d is None:
+                known_total = None
+                break
+            known_total *= d
+        if known_total is not None:
+            output_total = 1
+            for d in result:
+                if d is None:
+                    output_total = None
+                    break
+                output_total *= d
+            if output_total is not None and output_total != known_total:
+                raise ValueError("reshape total element count is inconsistent")
 
     return result
 
@@ -1227,6 +1284,13 @@ def _eval_loop_output_types_func(env: _EvalEnv) -> list[TypeProto]:
     return result
 
 
+def _typeproto_equal(left: TypeProto, right: TypeProto) -> bool:
+    """Return ``True`` when two ONNX type protos are byte-for-byte equal."""
+    return left.SerializeToString(deterministic=True) == right.SerializeToString(
+        deterministic=True
+    )
+
+
 def _eval_attribute_func(call: FuncCall, env: _EvalEnv) -> Any:
     """Evaluate ``attribute(name, default)`` against runtime attributes."""
     name = _eval_expr(call.args[0], env)
@@ -1468,22 +1532,65 @@ def _execute_spec(
         elif isinstance(stmt, ResultStmt):
             if stmt.field == "shape":
                 val = _eval_expr(stmt.expr, env)
-                shape_results[stmt.target] = _to_shape(val)
+                new_value = _to_shape(val)
+                if (
+                    stmt.target in shape_results
+                    and shape_results[stmt.target] != new_value
+                ):
+                    raise ConstraintViolation(
+                        f"Conflicting assignments for {stmt.target}.shape"
+                    )
+                shape_results[stmt.target] = new_value
             elif stmt.field == "type":
                 val = _eval_expr(stmt.expr, env)
-                type_results[stmt.target] = int(val)
+                new_value = int(val)
+                if (
+                    stmt.target in type_results
+                    and type_results[stmt.target] != new_value
+                ):
+                    raise ConstraintViolation(
+                        f"Conflicting assignments for {stmt.target}.type"
+                    )
+                type_results[stmt.target] = new_value
             elif stmt.field == "value":
                 val = _eval_expr(stmt.expr, env)
-                if isinstance(val, (list, tuple)):
-                    value_results[stmt.target] = list(val)
-                else:
-                    value_results[stmt.target] = [val]
+                new_value = list(val) if isinstance(val, (list, tuple)) else [val]
+                if (
+                    stmt.target in value_results
+                    and value_results[stmt.target] != new_value
+                ):
+                    raise ConstraintViolation(
+                        f"Conflicting assignments for {stmt.target}.value"
+                    )
+                value_results[stmt.target] = new_value
             elif stmt.field == "onnx_type":
                 val = _eval_expr(stmt.expr, env)
                 if isinstance(val, TypeProto):
-                    onnx_type_results[stmt.target] = copy.deepcopy(val)
+                    new_value = copy.deepcopy(val)
+                    existing = onnx_type_results.get(stmt.target)
+                    if isinstance(existing, TypeProto) and not _typeproto_equal(
+                        existing, new_value
+                    ):
+                        raise ConstraintViolation(
+                            f"Conflicting assignments for {stmt.target}.onnx_type"
+                        )
+                    onnx_type_results[stmt.target] = new_value
                 elif isinstance(val, list) and all(isinstance(item, TypeProto) for item in val):
-                    onnx_type_results[stmt.target] = list(val)  # type: ignore[assignment]
+                    new_value = list(val)
+                    existing = onnx_type_results.get(stmt.target)
+                    if isinstance(existing, list) and len(existing) == len(new_value):
+                        if any(
+                            not _typeproto_equal(left, right)
+                            for left, right in zip(existing, new_value)
+                        ):
+                            raise ConstraintViolation(
+                                f"Conflicting assignments for {stmt.target}.onnx_type"
+                            )
+                    elif existing is not None:
+                        raise ConstraintViolation(
+                            f"Conflicting assignments for {stmt.target}.onnx_type"
+                        )
+                    onnx_type_results[stmt.target] = new_value  # type: ignore[assignment]
 
     return shape_results, type_results, value_results, onnx_type_results
 
