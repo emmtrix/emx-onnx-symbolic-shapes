@@ -1347,6 +1347,10 @@ def _eval_func(call: FuncCall, env: _EvalEnv) -> Any:
         arg_name = call.args[0]
         if isinstance(arg_name, Identifier) and arg_name.name in env.tensor_values:
             return list(env.tensor_values[arg_name.name])
+        if isinstance(arg_name, Identifier) and arg_name.name in env.shapes:
+            # ``shape_value`` resolves shape-tensor contents, not the tensor's
+            # own shape. Without a known value we must degrade conservatively.
+            return []
         if isinstance(arg_name, Identifier) and arg_name.name not in env.variables:
             return []
         # Fall back to evaluating normally

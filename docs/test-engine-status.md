@@ -16,8 +16,7 @@
 
 | Count | Result |
 | ---: | --- |
-| 1 | output 'seq' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [2, 6]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["unk__0", 6]}, "kind": "sequence"} |
-| 1 | output 'seq' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 1]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [3, "unk__0"]}, "kind": "sequence"} |
+| 0 | _No error results_ |
 
 ## Test Cases
 
@@ -1543,8 +1542,8 @@
 | node::test_split_equal_parts_2d_opset13 | OK | OK |
 | node::test_split_equal_parts_default_axis_opset13 | OK | OK |
 | node::test_split_equal_parts_default_axis_opset18 | OK | OK |
-| node::test_split_to_sequence_1 | OK | output 'seq' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [3, 1]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [3, "unk__0"]}, "kind": "sequence"} |
-| node::test_split_to_sequence_2 | OK | output 'seq' mismatch: OTSL={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": [2, 6]}, "kind": "sequence"} ONNX={"elem": {"elem_type": "FLOAT", "kind": "tensor", "shape": ["unk__0", 6]}, "kind": "sequence"} |
+| node::test_split_to_sequence_1 | OK | OK |
+| node::test_split_to_sequence_2 | OK | OK |
 | node::test_split_to_sequence_nokeepdims | OK | OK |
 | node::test_split_variable_parts_1d_opset13 | OK | OK |
 | node::test_split_variable_parts_1d_opset18 | OK | OK |

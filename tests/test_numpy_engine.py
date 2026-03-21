@@ -504,6 +504,32 @@ class TestNumpyEngineBasic:
             graph, opset_imports=[helper.make_opsetid("", 21)]
         )
 
+    @staticmethod
+    def _split_to_sequence_model(
+        data_shape: list[int],
+        split_shape: list[int] | None,
+        *,
+        axis: int,
+        keepdims: int = 1,
+    ) -> ModelProto:
+        inputs = [helper.make_tensor_value_info("data", TensorProto.FLOAT, data_shape)]
+        node_inputs = ["data"]
+        if split_shape is not None:
+            inputs.append(
+                helper.make_tensor_value_info("split", TensorProto.INT64, split_shape)
+            )
+            node_inputs.append("split")
+        outputs = [
+            helper.make_tensor_sequence_value_info("seq", TensorProto.FLOAT, None)
+        ]
+        node = helper.make_node(
+            "SplitToSequence", node_inputs, ["seq"], axis=axis, keepdims=keepdims
+        )
+        graph = helper.make_graph([node], "test_graph", inputs, outputs)
+        return helper.make_model(
+            graph, opset_imports=[helper.make_opsetid("", 17)]
+        )
+
     def test_type_passthrough(self) -> None:
         """Unary op preserves input type."""
         m = self._typed_model("Relu", [([2, 3], TensorProto.DOUBLE)])
@@ -555,6 +581,33 @@ class TestNumpyEngineBasic:
         m = self._typed_model("NonZero", [([2, 2], TensorProto.DOUBLE)])
         result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.INT64}
+
+    def test_split_to_sequence_scalar_split_without_value_keeps_unknown_dim(self) -> None:
+        m = self._split_to_sequence_model([3, 6], [], axis=1)
+        result = otsl_infer_shapes(m)
+        signature = _type_signature(result.graph.output[0].type)
+        assert signature["kind"] == "sequence"
+        assert signature["elem"]["kind"] == "tensor"
+        assert signature["elem"]["elem_type"] == "FLOAT"
+        assert signature["elem"]["shape"][0] == 3
+        assert isinstance(signature["elem"]["shape"][1], str)
+
+    def test_split_to_sequence_vector_split_without_value_keeps_unknown_dim(self) -> None:
+        m = self._split_to_sequence_model([3, 6], [2], axis=0)
+        result = otsl_infer_shapes(m)
+        signature = _type_signature(result.graph.output[0].type)
+        assert signature["kind"] == "sequence"
+        assert signature["elem"]["kind"] == "tensor"
+        assert signature["elem"]["elem_type"] == "FLOAT"
+        assert isinstance(signature["elem"]["shape"][0], str)
+        assert signature["elem"]["shape"][1] == 6
+
+    def test_split_to_sequence_without_split_input_uses_unit_dim(self) -> None:
+        m = self._split_to_sequence_model([3, 6], None, axis=1)
+        result = otsl_infer_shapes(m)
+        signature = _type_signature(result.graph.output[0].type)
+        assert signature["kind"] == "sequence"
+        assert signature["elem"]["shape"] == [3, 1]
 
     def test_type_concat_passthrough(self) -> None:
         """Concat preserves input type."""
