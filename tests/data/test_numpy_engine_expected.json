@@ -12175,7 +12175,7 @@
     },
     "node::test_split_to_sequence_1": {
       "expected": {
-        "comparison_result": "output 'seq' mismatch: OTSL={\"elem\": {\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [3, 1]}, \"kind\": \"sequence\"} ONNX={\"elem\": {\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [3, \"unk__0\"]}, \"kind\": \"sequence\"}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_split_to_sequence_1",
@@ -12183,7 +12183,7 @@
     },
     "node::test_split_to_sequence_2": {
       "expected": {
-        "comparison_result": "output 'seq' mismatch: OTSL={\"elem\": {\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [2, 6]}, \"kind\": \"sequence\"} ONNX={\"elem\": {\"elem_type\": \"FLOAT\", \"kind\": \"tensor\", \"shape\": [\"unk__0\", 6]}, \"kind\": \"sequence\"}"
+        "comparison_result": "OK"
       },
       "kind": "node",
       "model_name": "test_split_to_sequence_2",
