@@ -15,8 +15,10 @@ import pytest
 from onnx import ModelProto, TensorProto, TypeProto, helper, numpy_helper
 from onnx import shape_inference
 
-from otsl.numerical_engine import OtslNumericalShapeInferenceEngine
+from otsl.numerical_engine import ConstraintViolation, OtslNumericalShapeInferenceEngine
+from otsl.numerical_engine import _execute_spec
 from otsl.numerical_engine import infer_shapes as otsl_infer_shapes
+from otsl.parser import parse
 from tests.official_numerical_engine_suite import (
     EXPECTED_RESULTS_PATH,
     OfficialTestCase,
@@ -634,3 +636,62 @@ class TestNumericalEngineBasic:
         )
         result = otsl_infer_shapes(m)
         assert get_output_types(result) == {"output": TensorProto.DOUBLE}
+
+
+class TestSpecExecutionSemantics:
+    def test_duplicate_result_assignment_must_match(self) -> None:
+        spec = parse(
+            "rules { outputs Y; result Y.shape = [1]; result Y.shape = [2]; }"
+        )
+        with pytest.raises(ConstraintViolation, match="Conflicting assignments"):
+            _execute_spec(spec, {}, {})
+
+    def test_normalize_axis_rejects_out_of_range_axis(self) -> None:
+        spec = parse(
+            "rules { inputs X; outputs Y; attributes axis; "
+            "result Y.shape = [normalize_axis(axis, rank(X))]; }"
+        )
+        with pytest.raises(ValueError, match="out of range"):
+            _execute_spec(spec, {"X": [2, 3]}, {"axis": 5})
+
+    def test_concat_shape_rejects_rank_mismatch(self) -> None:
+        spec = parse(
+            "rules { inputs Xs[]; outputs Y; attributes axis; "
+            "result Y.shape = concat_shape(Xs, axis); }"
+        )
+        with pytest.raises(ValueError, match="rank mismatch"):
+            _execute_spec(spec, {"Xs": [[2, 3], [2, 3, 4]]}, {"axis": 1})
+
+    def test_concat_shape_rejects_non_axis_dim_mismatch(self) -> None:
+        spec = parse(
+            "rules { inputs Xs[]; outputs Y; attributes axis; "
+            "result Y.shape = concat_shape(Xs, axis); }"
+        )
+        with pytest.raises(ValueError, match="concat_shape mismatch"):
+            _execute_spec(spec, {"Xs": [[2, 3], [4, 3]]}, {"axis": 1})
+
+    def test_resolve_reshape_rejects_multiple_negative_one(self) -> None:
+        spec = parse(
+            "rules { inputs data, shape_input; outputs Y; "
+            "result Y.shape = resolve_reshape(shape(data), shape_value(shape_input), 0); }"
+        )
+        with pytest.raises(ValueError, match="at most one -1"):
+            _execute_spec(
+                spec,
+                {"data": [2, 3], "shape_input": [2]},
+                {},
+                tensor_values={"shape_input": [-1, -1]},
+            )
+
+    def test_resolve_reshape_rejects_inconsistent_known_total(self) -> None:
+        spec = parse(
+            "rules { inputs data, shape_input; outputs Y; "
+            "result Y.shape = resolve_reshape(shape(data), shape_value(shape_input), 0); }"
+        )
+        with pytest.raises(ValueError, match="inconsistent"):
+            _execute_spec(
+                spec,
+                {"data": [2, 3], "shape_input": [2]},
+                {},
+                tensor_values={"shape_input": [4, 4]},
+            )

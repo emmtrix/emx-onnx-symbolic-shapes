@@ -20,7 +20,7 @@ The language core is intentionally small. OTSL contains only three statement for
 
 Complex inference algorithms are expressed through **built-in functions**. Built-ins are normatively specified helper functions with fixed names, signatures, evaluation rules, and error conditions. This design keeps the DSL small, makes implementations easier to build, allows incremental migration from existing imperative ONNX inference code, and permits 100% of ONNX operators to be specified without introducing general computation into the language.
 
-OTSL remains the human-readable authoring format. The canonical representation is a structured AST embedded in the ONNX `OpSchema` definition.
+OTSL remains the human-readable authoring format. In this repository, the authoritative in-memory representation is the Python AST defined in `otsl.ast`.
 
 ---
 
@@ -107,9 +107,7 @@ OTSL defines the following semantic domains.
 
 ### Rank
 
-`rank(tensor)` is either a non-negative integer or `?`.
-
-`?` denotes unknown rank.
+`rank(tensor)` is implemented as a non-negative integer derived from the known shape list of a tensor.
 
 Example:
 
@@ -117,7 +115,7 @@ Example:
 rank(A)
 ```
 
-If `rank(tensor)` is `?`, expressions that require a concrete rank are unresolved unless a built-in specification defines a different fallback behavior. Unknown rank does not by itself make inference `invalid`.
+The current reference implementation does not carry a separate unknown-rank value. If a tensor shape is unavailable, expressions depending on rank usually cannot be evaluated and model-level inference degrades conservatively.
 
 ### Dim
 
@@ -146,11 +144,11 @@ OTSL uses the following dimension model.
 | expression | `dim(A,0) + 5` | deterministic term over dimensions |
 | unknown | `?` | fresh unknown dimension term |
 
-There is no `sym("N")` constructor. Symbolic relationships arise from repeated use of the same dimension term and from equality constraints. For example, `dim(A,0)` denotes the same symbolic dimension wherever it appears, and `require dim(A,0) == dim(B,1)` unifies those dimensions for later evaluation.
+There is no `sym("N")` constructor. Symbolic relationships arise from repeated reuse of the same dimension term or `let` binding in a single evaluation.
 
-There is no `unknown_nonnegative()` constructor. All dimension terms are implicitly constrained to be non-negative because they denote tensor extents.
+The reference implementation also exposes `unknown_nonnegative()` as a built-in constructor for anonymous non-negative unknown dimensions. This is used by data-dependent operators such as `NonZero`, `Unique`, and `Compress`, where the result is unknown but should not introduce a fresh symbolic name into the emitted ONNX shape.
 
-Each syntactic occurrence of `?` introduces a distinct fresh dimension variable. Two occurrences of `?` are considered equal only if later constraints unify them.
+Each syntactic occurrence of `?` introduces a distinct fresh symbolic dimension variable at evaluation time.
 
 Example:
 
@@ -179,9 +177,7 @@ rank(T) = length(shape(T))
 
 If `shape(T)` is known with length `k`, then `rank(T) = k`.
 
-If `rank(T)` is known but `shape(T)` is otherwise unknown, `shape(T)` is treated as a shape of length `rank(T)` whose entries are fresh unknown dimensions.
-
-If both `shape(T)` and `rank(T)` are unknown, any expression depending on their concrete length is unresolved.
+The current reference implementation does not synthesize an independent shape from a known rank. If no shape list is available for `T`, operations that depend on `shape(T)` or `rank(T)` usually cannot be evaluated and node-level inference degrades conservatively.
 
 ### Type
 
@@ -203,7 +199,6 @@ Examples:
 ```
 type(X)
 type(X) == type(Y)
-type(X) in {float, double}
 ```
 
 ### Bool
@@ -215,20 +210,20 @@ Examples:
 ```
 dim(A,0) == dim(B,0)
 type(X) == type(Y)
-known(dim(A,0))
 ```
 
 ### Type System Scope
 
-OTSL currently models only tensor element types.
+OTSL directly models tensor shapes and tensor element types through `shape(...)`, `dim(...)`, `rank(...)`, and `type(...)`.
 
-Composite ONNX types are outside the current DSL scope, including:
+The reference implementation additionally supports full ONNX `TypeProto` values through the result field `output.onnx_type` and a small set of built-ins such as:
 
-- `sequence`
-- `map`
-- `optional`
+- `sequence_type(...)`
+- `unwrap_optional_type(...)`
+- `if_output_types()`
+- `loop_output_types()`
 
-Semantics involving composite ONNX types must be handled by built-ins or by schema-level rules outside the core OTSL expression system.
+Composite ONNX types are therefore not structurally authorable in the core expression grammar, but they are part of the implemented language surface via these built-ins and result fields.
 
 ---
 
@@ -250,9 +245,7 @@ rules {
   outputs Y;
   attributes axis;
 
-  require same_type(Xs);
-  let ax = normalize_axis(axis, rank(Xs[0]));
-  result Y.shape = concat_shape(Xs, ax);
+  result Y.shape = concat_shape(Xs, axis);
   result Y.type = type(Xs[0]);
 }
 ```
@@ -272,10 +265,9 @@ Examples:
 ```
 require dim(A,1) == dim(B,0);
 require type(X) == type(Y);
-require type(X) in {float, double};
 ```
 
-If a `require` predicate is proved false, the rule result is `invalid`.
+In the reference implementation, `require` is evaluated eagerly. A falsy result makes the current spec execution `invalid`.
 
 ### `let`
 
@@ -320,7 +312,7 @@ OTSL expressions are first-order, side-effect-free terms. They may contain:
 - input, output, attribute, and `let` references
 - shape literals such as `[dim(A,0), 4]`
 - arithmetic over dimensions
-- comparisons and set membership
+- comparisons and boolean combinations
 - built-in function calls
 - conditional expressions
 
@@ -331,9 +323,6 @@ d1 + d2
 d1 - d2
 d1 * d2
 floordiv(d1,d2)
-ceildiv(d1,d2)
-max(d1,d2)
-min(d1,d2)
 ```
 
 Conditional behavior is expressed with:
@@ -342,22 +331,7 @@ Conditional behavior is expressed with:
 if condition then expr1 else expr2
 ```
 
-Conditional expressions use three-valued predicate evaluation:
-
-- if `condition` is `true`, the result is `expr1`
-- if `condition` is `false`, the result is `expr2`
-- if `condition` is `unknown`, and `normalize(expr1)` and `normalize(expr2)` are structurally identical canonical expressions, the result is that canonical value
-- otherwise the conditional expression is unresolved
-
-Structural equality is equality of canonical normalized expression trees.
-
-Expressions depending on unknown rank are unresolved unless a built-in defines a specific fallback rule.
-
-Example:
-
-```
-if rank(A) == ? then prefix(shape(A),2) is unresolved
-```
+The reference implementation evaluates `if` eagerly using the runtime truthiness of the condition value. In practice this is primarily used with ONNX attributes such as `transA`, `transB`, `keepdims`, or similar `0`/`1` flags.
 
 The DSL does not include:
 
@@ -366,63 +340,26 @@ The DSL does not include:
 - `map`
 - `range`
 - `sum`
+- set membership syntax such as `in { ... }`
+- optional input declarations such as `B?`
 
 Structural iteration must be expressed through built-ins. This keeps the language small and shifts complex, reusable algorithms into normatively specified helper functions.
 
 Expressions that observe tensor shape and rank obey the following rules:
 
-1. `rank(T) = length(shape(T))`.
-2. If `shape(T)` is known with length `k`, then `rank(T)` is `k`.
-3. If `rank(T)` is known but `shape(T)` is otherwise unavailable, `shape(T)` is treated as a shape of length `rank(T)` whose entries are fresh unknown dimensions.
-4. If `rank(T)` is unknown, expressions depending on a concrete dimension count are unresolved.
+1. `rank(T)` is implemented as `len(shape(T))`.
+2. `shape(T)` is available only when the reference engine has a concrete or partially known shape list for `T`.
+3. If no shape is available for `T`, expression evaluation typically cannot proceed and model-level inference degrades conservatively by skipping inference for the current node.
 
 The built-in `dim(tensor,index)` obeys the following rules:
 
-1. If `rank(tensor)` is known and `index` is within bounds after any required negative-index normalization, return the corresponding dimension.
-2. If `rank(tensor)` is known and `index` is outside bounds, inference is `invalid`.
-3. If `rank(tensor)` is unknown, the result is an unresolved dimension term.
-4. Negative indices are normalized only when rank is known.
+1. Negative indices are normalized against the concrete known rank of the supplied shape.
+2. If the normalized index is out of bounds, the call is `invalid`.
+3. If the tensor shape is unavailable, evaluation typically fails for the current node and model-level inference degrades conservatively.
 
 ### Dimension Expression Canonicalization
 
-Dimension expressions are normalized to a canonical form. Implementations must produce structurally identical canonical expressions for identical normalized terms.
-
-Canonicalization obeys the following rules:
-
-- addition and multiplication are associative and must be flattened
-- constant folding must be applied
-- identity elements must be removed
-- operands of commutative operators must be sorted deterministically
-
-Examples:
-
-```
-(a + (b + c)) -> (a + b + c)
-(a + 2 + 3) -> (a + 5)
-(a * 1) -> a
-(a * 0) -> 0
-```
-
-For commutative operators, operands must be sorted in the following order:
-
-1. constants
-2. direct dimension references such as `dim(A,i)`
-3. symbolic unknowns
-4. compound expressions
-
-Within each category, implementations must use a deterministic structural ordering derived from the canonical textual form of the operand after recursive normalization.
-
-Canonicalization includes:
-
-- recursive normalization of child expressions
-- substitution of solved equalities already available in the current environment
-- elimination of additive identity `0`
-- elimination of multiplicative identity `1`
-- collapse of multiplication by `0` to `0`
-- flattening of nested additions and nested multiplications
-- constant folding over normalized constant operands
-
-General algebraic search, factorization, distributivity-based rewriting, or non-deterministic rearrangement is not required and must not be applied.
+The current reference implementation does not perform a separate global canonicalization or symbolic normalization pass. Expressions are evaluated eagerly to Python values, symbolic unknown names, ONNX `TypeProto` instances, or shape lists.
 
 ---
 
@@ -430,176 +367,42 @@ General algebraic search, factorization, distributivity-based rewriting, or non-
 
 ### Overview
 
-The OTSL surface language is intentionally minimal. Complex inference algorithms are provided through built-in functions.
+The OTSL surface language is intentionally minimal. Most operator-specific behavior therefore lives in built-ins.
 
-Built-ins are:
+The current reference implementation ships a fixed built-in library in `otsl.numerical_engine` and `otsl.numpy_engine`. These built-ins fall into four rough groups:
 
-- deterministic
-- pure
-- side-effect-free
-- normatively specified
-- identified by stable names and signatures
+- core shape helpers such as `shape`, `dim`, `rank`, `prefix`, `suffix`, `concat`, `broadcast`, and `normalize_axis`
+- shape-input helpers such as `shape_value`, `resolve_reshape`, `slice_shape`, `resize_shape`, `split_shapes`, and `pad_shape`
+- type and attribute helpers such as `type`, `attribute`, `input_type`, `attribute_value_type`, `attribute_value_shape`, and `attribute_values`
+- composite-type helpers such as `sequence_type`, `sequence_elem_shape`, `sequence_elem_type`, `unwrap_optional_type`, `if_output_types`, and `loop_output_types`
 
-Built-ins may correspond directly to existing ONNX helper logic or existing `TypeAndShapeInferenceFunction` implementations, provided the semantics remain the normative semantics defined by this RFC.
+Built-ins may be implemented either as pure argument-to-value functions or as environment-aware helpers that inspect known input types, ONNX attributes, or graph substructures.
 
-Built-ins are part of the OTSL specification. They are not implementation-defined extension points.
+### Current Contract
 
-If a built-in receives unknown rank or other unresolved inputs, it must either:
+For the current reference implementation:
 
-- return an unresolved result
-- return the deterministic fallback result defined by its own specification
+- built-in names are fixed by the dispatch tables in the engines
+- a built-in either returns a runtime value or raises an exception
+- exceptions are treated as spec execution failure for the current node
+- model-level inference catches a bounded set of node-local failures and degrades conservatively
 
-A built-in must not fail solely because information is unavailable unless its specification explicitly requires concrete information as a validity condition.
-
-### Common Built-ins
-
-Common built-ins include:
-
-| Name | Signature | Meaning |
-|------|-----------|---------|
-| `shape` | `shape(tensor: Tensor) -> Shape` | Returns the tensor shape when available |
-| `dim` | `dim(tensor: Tensor, index: Int) -> Dim` | Returns one dimension, supporting negative indices |
-| `prefix` | `prefix(value: Shape, count: Int) -> Shape` | Returns the leading dimensions |
-| `suffix` | `suffix(value: Shape, count: Int) -> Shape` | Returns the trailing dimensions |
-| `concat` | `concat(left: Shape, right: Shape) -> Shape` | Concatenates two shapes |
-| `permute` | `permute(value: Shape, order: IntSeq) -> Shape` | Applies a permutation |
-| `broadcast` | `broadcast(left: Shape, right: Shape) -> Shape` | Computes ONNX broadcast shape |
-| `normalize_axis` | `normalize_axis(axis: Int, rank: Rank) -> Int` | Normalizes a possibly negative axis |
-| `resolve_reshape` | `resolve_reshape(input_shape: Shape, target: ShapeInput, allowzero: Int) -> Shape` | Computes ONNX reshape result |
-| `concat_shape` | `concat_shape(inputs: TensorSeq, axis: Int) -> Shape` | Computes ONNX concat result shape |
-
-### Built-in Specification Format
-
-Every built-in specification in this RFC or in future extensions must contain the following fields:
-
-- `Name`
-- `Signature`
-- `Input domain`
-- `Evaluation rules`
-- `Error conditions`
-
-The signature defines the arity and abstract domains of the arguments and result. The input domain defines when the built-in is applicable. The evaluation rules define the exact deterministic result. The error conditions define when the built-in causes inference to return `invalid` instead of a partial or unknown result.
-
-Auxiliary signature domains used in built-in specifications are:
-
-- `Tensor`: a schema-declared tensor input or output
-- `TensorSeq`: a schema-declared variadic tensor input family
-- `ShapeInput`: a schema-declared shape-carrying input
-- `IntSeq`: a finite abstract integer sequence whose entries may be known integers or unknown entries
-
-### Example Built-in Specifications
-
-#### `broadcast`
-
-- `Name`: `broadcast`
-- `Signature`: `broadcast(left: Shape, right: Shape) -> Shape`
-- `Input domain`:
-  - `left` and `right` are finite shapes.
-  - Each dimension is a non-negative dimension term.
-- `Evaluation rules`:
-  1. Let `m = len(left)`, `n = len(right)`, and `r = max(m, n)`.
-  2. Align `left` and `right` by trailing dimension. Missing leading dimensions are treated as constant `1`.
-  3. For each aligned pair `(a, b)`:
-     - if `normalize(a)` and `normalize(b)` are syntactically identical, the result dimension is that normalized term
-     - else if `normalize(a) == 1`, the result dimension is `normalize(b)`
-     - else if `normalize(b) == 1`, the result dimension is `normalize(a)`
-     - else if both normalize to distinct known constants greater than `1`, inference is `invalid`
-     - else the result dimension is `?`
-  4. The result shape is the ordered list of the dimensions produced in step 3.
-- `Error conditions`:
-  - any aligned pair of dimensions that are provably incompatible by ONNX broadcast rules makes the call `invalid`
-  - unavailable input information does not itself make the call `invalid`; it yields `?` in the corresponding output dimension
-
-#### `normalize_axis`
-
-- `Name`: `normalize_axis`
-- `Signature`: `normalize_axis(axis: Int, rank: Rank) -> Int`
-- `Input domain`:
-  - `rank` denotes the rank of the tensor to which the axis applies.
-  - `axis` is an integer-valued attribute or integer expression available to inference.
-- `Evaluation rules`:
-  1. If `rank` is a known constant `r` and `r == 0`, inference is `invalid`.
-  2. If `rank` is a known constant `r` and `axis` is a known constant `a`:
-     - if `0 <= a < r`, return `a`
-     - else if `-r <= a < 0`, return `a + r`
-     - else inference is `invalid`
-  3. If either argument is not known exactly, the result is unresolved.
-- `Error conditions`:
-  - rank `0`
-  - a known axis outside the closed-open interval `[-rank, rank)`
-
-#### `resolve_reshape`
-
-- `Name`: `resolve_reshape`
-- `Signature`: `resolve_reshape(input_shape: Shape, target: ShapeInput, allowzero: Int) -> Shape`
-- `Input domain`:
-  - `input_shape` is the input tensor shape.
-  - `target` is the schema-designated shape-carrying input of `Reshape`.
-  - `allowzero` is either `0` or `1`.
-- `Evaluation rules`:
-  1. Read `target` as an abstract integer sequence `t`.
-  2. If the length of `t` is unavailable, the result is unresolved.
-  3. For each index `i` in `t`:
-     - if `t[i] > 0`, output dimension `i` is the constant `t[i]`
-     - if `t[i] == 0` and `allowzero == 0`, output dimension `i` is `input_shape[i]`
-     - if `t[i] == 0` and `allowzero == 1`, output dimension `i` is `0`
-     - if `t[i] == -1`, mark index `i` as the inferred dimension position
-     - if `t[i]` is unknown, output dimension `i` is `?`
-     - if `t[i] < -1`, inference is `invalid`
-  4. At most one index may be marked by `-1`. More than one such index is `invalid`.
-  5. If no `-1` occurs:
-     - if both the total element count of `input_shape` and the total element count of the candidate output shape are known and unequal, inference is `invalid`
-     - otherwise return the candidate output shape
-  6. If exactly one `-1` occurs:
-     - let `known_product` be the product of all output dimensions other than the `-1` position after applying the rules above
-     - if `input_shape` has a known total element count and `known_product` is a known positive integer that divides that count evenly, replace `-1` with the quotient
-     - if element counts are known and no valid quotient exists, inference is `invalid`
-     - otherwise replace the `-1` position with `?`
-- `Error conditions`:
-  - `allowzero` not in `{0,1}`
-  - any target entry smaller than `-1`
-  - more than one `-1`
-  - copying with `0` when `allowzero == 0` and the corresponding input dimension does not exist
-  - known input and output element counts that contradict ONNX `Reshape`
-
-#### `concat_shape`
-
-- `Name`: `concat_shape`
-- `Signature`: `concat_shape(inputs: TensorSeq, axis: Int) -> Shape`
-- `Input domain`:
-  - `inputs` is a non-empty variadic tensor family
-  - `axis` is an integer axis for those tensors
-- `Evaluation rules`:
-  1. If `inputs` is empty, inference is `invalid`.
-  2. Let `r = rank(inputs[0])`.
-  3. If `r` is unavailable, the result is unresolved.
-  4. If any input has a known rank different from `r`, inference is `invalid`.
-  5. Let `ax = normalize_axis(axis, r)`.
-  6. For each dimension position `j` with `0 <= j < r`:
-     - if `j != ax`, compare `dim(inputs[k], j)` for all `k`
-       - if any pair is provably unequal, inference is `invalid`
-       - otherwise the result dimension is `normalize(dim(inputs[0], j))`
-     - if `j == ax`, the result dimension is the left-associated sum of `normalize(dim(inputs[k], j))` for all `k`, with constant folding applied when possible; if any participating term is completely unavailable, the result dimension is `?`
-  7. The result shape is the ordered list produced in step 6.
-- `Error conditions`:
-  - empty input family
-  - provably inconsistent non-axis dimensions
-  - known ranks that disagree
-  - invalid axis
+This RFC documents the current shipped language surface, not a separate symbolic calculus beyond what the implementation executes today.
 
 ### Operator-specific Built-ins
 
-Some operators are most naturally expressed through dedicated helper built-ins rather than primitive expression combinations. This is permitted and expected.
+Many operators are intentionally specified as thin wrappers around reusable helper built-ins. Examples currently shipped in the reference implementation include:
 
-Examples include:
-
-- `conv_output_shape`
-- `slice_output_shape`
-- `resize_output_shape`
-- `gather_output_shape`
-- `matmul_output_shape`
-
-These built-ins correspond to normatively specified ONNX inference behavior and may be implemented by reusing existing ONNX helper logic. Their purpose is to keep the DSL small while still allowing the full operator set to be specified.
+- `conv_shape`
+- `convtranspose_shape`
+- `pool_shape`
+- `global_pool_shape`
+- `resize_shape`
+- `einsum_shape`
+- `rnn_shape`
+- `stft_shape`
+- `col2im_shape`
+- `range_output_shape`
 
 ---
 
@@ -609,7 +412,7 @@ Built-ins are part of the ONNX specification.
 
 Built-in names must be globally unique within the OTSL built-in library.
 
-Built-ins are versioned with the operator schema or opset version in which they are used normatively. A semantic change to a built-in requires the same review and versioning discipline applied to other normative ONNX operator semantics.
+In a future ONNX integration, built-ins should be versioned together with the operator schema or opset in which they are used. The current repository ships one active implementation per built-in name.
 
 Operator-specific built-ins must use descriptive names tied to operator semantics.
 
@@ -647,128 +450,45 @@ If the required contents are unavailable, the built-in must produce a conservati
 
 ## 12 Partial Inference
 
-OTSL supports incomplete knowledge for both types and shapes.
+The reference implementation supports incomplete knowledge for both types and shapes, but does so with eager runtime values rather than a separate symbolic constraint solver.
 
 Possible dimension forms include:
 
 | Kind | Example |
 |------|---------|
 | known constant | `32` |
-| propagated dimension | `dim(A,0)` |
-| expression | `dim(A,0) + 5` |
-| unknown | `?` |
+| symbolic unknown | `?` |
+| anonymous unknown | `unknown_nonnegative()` |
 
-Partial inference is fundamental. Missing information must not cause hard failure unless a rule proves the operator invocation invalid.
+The implementation distinguishes two common cases:
 
-Examples:
+- `?` evaluates to a fresh symbolic dimension name such as `unk__0`
+- operator-specific built-ins may return anonymous unknown dimensions represented without a symbolic name
 
-```
-require dim(A,0) == dim(B,0)
-result Y.shape = [dim(A,0), ?]
-```
+Missing information is handled conservatively:
 
-Equality constraints may refine unknown or symbolic relationships even when exact values are not known.
+- a built-in may return a shape containing anonymous unknown dimensions
+- a node may omit output inference for some fields
+- model-level inference may skip a node entirely when the spec cannot be executed with the information currently available
 
-Type inference may likewise remain unresolved when the rule block does not determine a unique element type.
+The current implementation does not perform global equality propagation from `require` into earlier or later expressions.
 
 ---
 
-## 13 Constraint Solving and Built-in Constraint Predicates
+## 13 Immediate Predicate Evaluation
 
-OTSL constraint solving is defined over normalized dimension and type terms. Let `normalize(t)` recursively substitute solved equalities into `t` and apply the canonicalization rules of section 8, including flattening of associative operators, removal of identity elements, constant folding, and deterministic operand ordering.
+The reference implementation does not implement a separate global constraint-solving phase.
 
-Equality constraints on dimensions are processed using the following rules:
+Instead:
 
-1. `constant == constant` succeeds iff the constants are identical; otherwise inference is `invalid`.
-2. Repeated occurrences of the same normalized dimension term denote the same symbolic entity.
-3. `dim(...) == dim(...)` merges the participating representatives into one equivalence class.
-4. `? == term` binds that fresh unknown term to `normalize(term)`, provided this does not create a cycle.
-5. `representative == expression` binds the representative to the normalized expression iff the representative does not occur within that expression.
-6. `expression == expression` succeeds when the normalized expressions are syntactically identical. If both normalize to different constants, inference is `invalid`. Otherwise the equality remains unresolved.
+1. expressions are evaluated eagerly in source order
+2. `require` checks the resulting predicate value immediately
+3. falsy predicates raise `ConstraintViolation`
+4. truthy predicates allow evaluation to continue
 
-Cyclic bindings are contradictions and therefore `invalid`.
+Successful `require` statements do not rewrite previously computed values, merge symbolic dimensions, or canonicalize expressions.
 
-If constraint solving derives an equation of the form:
-
-```
-d = d + k
-```
-
-where `k` is a positive known constant, inference is `invalid`.
-
-Examples of contradictions include:
-
-```
-dim(A,0) == dim(A,0) + 1
-dim(A,0) == -3
-```
-
-Every occurrence of `?` is fresh. If later equalities unify that fresh term with a constant, direct input dimension, or expression, that information propagates to every use of the same term created by that evaluation.
-
-Because dimensions denote tensor extents, any solved equality that forces a dimension to a negative known constant is a contradiction and therefore `invalid`.
-
-### Dimension Expression Canonicalization
-
-Canonicalization is part of the normative semantics of constraint solving.
-
-For normalized dimension expressions:
-
-- nested additions must be flattened into a single addition node
-- nested multiplications must be flattened into a single multiplication node
-- constant operands must be folded
-- additive identity `0` must be removed unless it is the only remaining operand
-- multiplicative identity `1` must be removed unless it is the only remaining operand
-- multiplication by `0` must normalize to `0`
-- operands of commutative operators must be sorted deterministically
-
-The required operand ordering is:
-
-1. constants
-2. direct dimension references
-3. symbolic unknowns
-4. compound expressions
-
-Within each class, operands are ordered by their canonical textual representation after recursive normalization.
-
-Two normalized expressions are structurally identical iff their canonical normalized expression trees are identical node-for-node and child-for-child. Independent implementations must therefore produce the same canonical expression tree for the same normalized term.
-
-Constraint propagation is monotonic and deterministic. Implementations may refine terms by:
-
-- substitution of solved equalities
-- equivalence-class merging
-- constant folding
-- local deterministic simplifications
-
-Implementations must not rely on:
-
-- backtracking
-- implementation-defined search
-- non-deterministic rewrite ordering
-- general-purpose symbolic algebra
-
-A `require` predicate evaluates in three-valued logic after normalization:
-
-- `true`: the predicate is satisfied
-- `false`: the rule result is `invalid`
-- `unknown`: the predicate remains unresolved and the overall result cannot be more precise than `partial`
-
-Common built-in constraint predicates include:
-
-```
-compatible(d1,d2)
-same_shape(A,B)
-same_type(Xs)
-known(d)
-```
-
-These predicates are defined as follows:
-
-- `known(d)` is `true` iff `normalize(d)` is a constant
-- `compatible(d1,d2)` is `false` only when the two normalized dimensions are provably unequal, `true` when they are provably equal, and `unknown` otherwise
-- `same_shape(A,B)` compares shapes pointwise using rank equality and `compatible`
-- `same_type(Xs)` is `true` iff all known element types in the family are identical, `false` if any two are provably different, and `unknown` otherwise
-
-Type equality and set membership are exact. No subtype relation is introduced.
+Built-in predicates such as `same_type`, `same_shape`, `compatible`, and `known` are not part of the currently shipped runtime unless explicitly implemented in the built-in dispatch tables.
 
 ---
 
@@ -783,7 +503,7 @@ rules {
   inputs X;
   outputs Y;
 
-  result Y.shape = [rank(X), ?];
+  result Y.shape = [rank(X), unknown_nonnegative()];
   result Y.type = int64;
 }
 ```
@@ -792,7 +512,7 @@ This rule is valid because:
 
 - the first output dimension is exactly the rank of `X`
 - the second output dimension is data-dependent and therefore unknown
-- the unknown dimension is still implicitly non-negative because all dimensions are non-negative
+- the unknown dimension is still constrained to denote a non-negative extent
 
 ---
 
@@ -805,13 +525,14 @@ rules {
   inputs A, B;
   outputs Y;
 
-  require type(A) == type(B);
-  result Y.shape = matmul_output_shape(A, B);
+  require dim(A,-1) == dim(B,-2);
+  let batch = broadcast(prefix(A,-2), prefix(B,-2));
+  result Y.shape = concat(batch, [dim(A,-2), dim(B,-1)]);
   result Y.type = type(A);
 }
 ```
 
-`matmul_output_shape` is an operator-specific built-in implementing the normative ONNX `MatMul` shape rules, including 1-D promotion, batch broadcasting, and output rank reduction.
+The shipped `MatMul` spec is intentionally small and expresses the implemented batch-broadcasting rule directly in the DSL.
 
 ### Concat
 
@@ -821,7 +542,6 @@ rules {
   outputs Y;
   attributes axis;
 
-  require same_type(Xs);
   result Y.shape = concat_shape(Xs, axis);
   result Y.type = type(Xs[0]);
 }
@@ -833,16 +553,18 @@ rules {
 
 ```
 rules {
-  inputs data, shape;
+  inputs data, shape_input;
   outputs reshaped;
   attributes allowzero;
 
-  result reshaped.shape = resolve_reshape(shape(data), shape, allowzero);
+  let target = shape_value(shape_input);
+  let az = attribute("allowzero", 0);
+  result reshaped.shape = resolve_reshape(shape(data), target, az);
   result reshaped.type = type(data);
 }
 ```
 
-`resolve_reshape` consumes the schema-designated shape-carrying input `shape` and applies the exact ONNX `Reshape` rules.
+`resolve_reshape` consumes the schema-designated shape-carrying input `shape_input` through `shape_value(...)`.
 
 ### NonZero
 
@@ -851,7 +573,7 @@ rules {
   inputs X;
   outputs Y;
 
-  result Y.shape = [rank(X), ?];
+  result Y.shape = [rank(X), unknown_nonnegative()];
   result Y.type = int64;
 }
 ```
@@ -860,123 +582,19 @@ This example has no loops, no structural iteration, and no dedicated shape-tenso
 
 ---
 
-## 16 Canonical Representation
+## 16 Reference AST
 
-The normative representation of OTSL is a structured AST. The textual syntax is a presentation format for authoring, review, and generated documentation.
+For this repository, the authoritative in-memory representation is the Python AST defined in `otsl.ast`.
 
-The AST contains:
+The current AST includes:
 
-- schema references for inputs, outputs, attributes, and variadic families
-- statement nodes of kind `require`, `let`, and `result`
-- expression nodes, including built-in calls and conditional expressions
-- schema metadata required by built-ins, such as shape-carrying input designations
+- top-level declarations: `InputDecl` and `ShapeSpec`
+- statement nodes: `RequireStmt`, `LetStmt`, `ResultStmt`
+- expression nodes: `NumberLit`, `UnknownDim`, `Identifier`, `StringLit`, `BinOp`, `FuncCall`, `ShapeLiteral`, `IndexExpr`, `IfExpr`
 
-Example (simplified JSON):
+The textual syntax is parsed by `otsl.parser` into this AST and then evaluated directly by the numerical and numpy engines.
 
-```json
-{
-  "statements": [
-    {
-      "kind": "let",
-      "name": "batch",
-      "expr": {
-        "op": "builtin",
-        "name": "broadcast",
-        "args": [
-          { "op": "builtin", "name": "prefix", "args": [{ "op": "shape", "tensor": "A" }, { "op": "const", "value": 1 }] },
-          { "op": "builtin", "name": "prefix", "args": [{ "op": "shape", "tensor": "B" }, { "op": "const", "value": 1 }] }
-        ]
-      }
-    },
-    {
-      "kind": "require",
-      "expr": {
-        "op": "eq",
-        "args": [
-          { "op": "type", "tensor": "A" },
-          { "op": "type", "tensor": "B" }
-        ]
-      }
-    },
-    {
-      "kind": "result",
-      "target": { "tensor": "Y", "field": "shape" },
-      "expr": {
-        "op": "if",
-        "cond": {
-          "op": "eq",
-          "args": [
-            { "op": "rank", "tensor": "A" },
-            { "op": "const", "value": 1 }
-          ]
-        },
-        "then": {
-          "op": "builtin",
-          "name": "concat",
-          "args": [
-            { "op": "var", "name": "batch" },
-            { "op": "shape_lit", "args": [{ "op": "builtin", "name": "dim", "args": [{ "op": "input", "name": "B" }, { "op": "const", "value": -1 }] }] }
-          ]
-        },
-        "else": {
-          "op": "builtin",
-          "name": "matmul_output_shape",
-          "args": [
-            { "op": "input", "name": "A" },
-            { "op": "input", "name": "B" }
-          ]
-        }
-      }
-    },
-    {
-      "kind": "result",
-      "target": { "tensor": "Y", "field": "type" },
-      "expr": { "op": "type", "tensor": "A" }
-    }
-  ]
-}
-```
-
-### C++ Shape and Type Rule Representation
-
-OTSL text is only a presentation format. The canonical representation used by ONNX schemas is an AST embedded in the C++ `OpSchema` definition.
-
-Example:
-
-```cpp
-OpSchema()
-  .SetTypeAndShapeRules(
-      Let(
-          "batch",
-          Builtin(
-              "broadcast",
-              Builtin("prefix", ShapeOf("A"), Const(1)),
-              Builtin("prefix", ShapeOf("B"), Const(1))
-          )
-      ),
-      Require(
-          Eq(TypeOf("A"), TypeOf("B"))
-      ),
-      Result(
-          OutputField("Y", "shape"),
-          If(
-              Eq(RankOf("A"), Const(1)),
-              Builtin(
-                  "concat",
-                  Var("batch"),
-                  ShapeLit(Builtin("dim", Input("B"), Const(-1)))
-              ),
-              Builtin("matmul_output_shape", Input("A"), Input("B"))
-          )
-      ),
-      Result(
-          OutputField("Y", "type"),
-          TypeOf("A")
-      )
-  );
-```
-
-The AST must encode only the minimal statement set plus the built-in calls and metadata needed to interpret them.
+Embedding an equivalent canonical AST into ONNX schema definitions is future work rather than current reference-implementation behavior.
 
 ---
 
@@ -985,62 +603,42 @@ The AST must encode only the minimal statement set plus the built-in calls and m
 Evaluation of an OTSL rule block is deterministic and proceeds as follows:
 
 1. Bind the schema-declared inputs, outputs, attributes, variadic families, and any schema metadata referenced by built-ins.
-2. Initialize the environment with the available input ranks, shapes, element types, attribute values, and abstract integer information already available to inference.
+2. Initialize the environment with the available input shapes, element types, full ONNX types, attribute values, and any shape-carrying tensor values already available to inference.
 3. Evaluate statements in source order.
-4. For each `let`, evaluate the right-hand side, normalize it with the current solved equalities, and bind the resulting expression to the given name.
-5. For each `require`, evaluate and normalize the predicate, add any equality information to the current constraint set, and classify the predicate as `true`, `false`, or `unknown`.
-6. If any active `require` becomes `false`, inference is `invalid`.
+4. For each `let`, evaluate the right-hand side eagerly and bind the resulting Python value to the given name.
+5. For each `require`, evaluate the predicate eagerly. If the result is falsy, spec execution is `invalid`.
+6. Successful `require` statements do not create a later normalization or equality-propagation phase.
 7. For each `result`, evaluate the right-hand side in the current environment and assign it to the target output field.
-8. Multiple assignments to the same output field are permitted only if the normalized assigned expressions are identical; otherwise inference is `invalid`.
+8. Multiple assignments to the same output field are permitted only if the assigned runtime values are identical; otherwise spec execution is `invalid`.
 9. Built-in calls are evaluated according to their normative specifications. A built-in may:
    - return an exact value
-   - return a symbolic or partial value containing direct dimension terms, expressions, or `?`
+   - return a symbolic unknown name or anonymous unknown dimension
    - determine that the invocation is `invalid` under its specified error conditions
-10. A built-in observes the constraint environment available at the time it is evaluated. The result produced by that evaluation may therefore be less precise than the final normalized result.
-11. After all statements have been processed, every built-in result, intermediate binding, and output expression is normalized using the complete constraint set accumulated during evaluation.
-12. Example:
+10. There is no final normalization pass after all statements have been processed.
+11. In the public graph inference API, node-local execution failures such as `ConstraintViolation`, `ValueError`, `TypeError`, `IndexError`, `KeyError`, `NameError`, `ZeroDivisionError`, or `AttributeError` are caught and treated as conservative degradation: inference for that node is skipped rather than aborting the whole model.
 
-```
-let s = broadcast(shape(A), shape(B))
-require dim(A,0) == dim(B,0)
-```
-
-The value of `s` may initially contain unresolved dimensions, but its final normalized form must reflect the equality constraint if that constraint resolves those dimensions.
-
-13. Classify the final result:
-    - `invalid` if any contradiction or built-in error condition was derived
-    - `exact` if every output type and dimension is fully known
-    - `symbolic` if outputs are determined and contain expressions over known symbolic dimension terms but no `?`
-    - `partial` if some outputs are derived but contain `?` or unresolved predicates
-    - `unknown` if no output property can be derived
-
-This algorithm defines the observable semantics. Implementations may optimize it, but any equivalent implementation must produce the same normalized outputs and status for the same inputs.
+This algorithm defines the observable behavior of the current reference implementation.
 
 ---
 
 ## 18 Error Semantics
 
-Evaluation of OTSL rules may produce:
+The current reference implementation distinguishes two layers:
 
-| Status | Meaning |
-|--------|---------|
-| `exact` | type and shape fully known |
-| `symbolic` | output uses symbolic dimension terms or expressions |
-| `partial` | output derived but some information remains unknown |
-| `unknown` | no output property can be derived |
-| `invalid` | the operator invocation violates required constraints |
+- spec execution (`_execute_spec`) may either produce output field values or raise an exception such as `ConstraintViolation` or `ValueError`
+- model-level inference (`infer_shapes`) catches a bounded set of node-local evaluation exceptions and degrades conservatively by leaving that node less inferred
 
-Missing information is not an error. Proven contradiction is an error.
+The public API does not currently expose a separate `exact` / `symbolic` / `partial` / `unknown` status lattice.
 
 ---
 
 ## 19 Integration with ONNX
 
-Each `OpSchema` may include an OTSL rule specification.
+A future ONNX integration may attach OTSL rule specifications to `OpSchema` definitions.
 
-OTSL rules correspond to the operator-level inference functions currently registered in ONNX `OpSchema` definitions. Existing ONNX inference functions propagate types and shapes forward through the graph and may perform partial inference when full shape information is unavailable. OTSL is intended to specify those same operator-level semantics in a declarative, machine-readable form.
+In this repository, OTSL rules are consumed directly by the Python reference engines rather than embedded into ONNX schema metadata.
 
-OTSL rules are versioned with the ONNX operator schema or opset version to which they apply. Built-ins are likewise versioned by the schema context in which they are interpreted. A semantic change to a rule or a built-in requires the same schema versioning discipline already used by ONNX.
+In this repository, specs are currently loaded from `otsl/specs/*.otsl` and keyed by lowercase `op_type`. Domain-specific or opset-specific dispatch is future work.
 
 If both an OTSL rule set and an imperative `TypeAndShapeInferenceFunction` are present for the same schema version, they must be semantically equivalent. The OTSL rule is the normative portable specification. The imperative function is an allowed implementation technique and backward-compatibility mechanism.
 
@@ -1079,17 +677,17 @@ Refactored OTSL rule:
 
 ```
 rules {
-  inputs X, W, B?;
+  inputs X, W;
   outputs Y;
   attributes auto_pad, dilations, group, kernel_shape, pads, strides;
 
   result Y.shape =
-    conv_output_shape(X, W, auto_pad, dilations, group, kernel_shape, pads, strides);
+    conv_shape(shape(X), shape(W), kernel_shape, strides, pads, dilations, group, auto_pad);
   result Y.type = type(X);
 }
 ```
 
-`conv_output_shape` may initially be implemented by reusing the existing imperative convolution inference logic, provided the built-in is documented with a fixed signature, deterministic evaluation rules, and explicit error conditions.
+`conv_shape` may be implemented by reusing existing imperative convolution inference logic, provided the built-in is documented with a fixed signature, deterministic evaluation rules, and explicit error conditions.
 
 This approach allows operator coverage to grow immediately while leaving room for later decomposition of a built-in into smaller shared helpers when that is beneficial.
 
@@ -1100,12 +698,12 @@ This approach allows operator coverage to grow immediately while leaving room fo
 A reference implementation should:
 
 - parse the OTSL textual format
-- represent the canonical AST
+- represent the reference AST used by the implementation
 - evaluate the three core statement forms
-- implement the normative built-in library
+- implement the shipped built-in library
 - propagate symbolic shapes and types
-- support partial inference
-- validate constraints deterministically
+- support conservative partial inference
+- validate eager predicate checks deterministically
 
 Suitable implementation languages include:
 

@@ -276,6 +276,14 @@ class TestParseErrors:
         assert exc_info.value.line >= 1
         assert exc_info.value.col >= 1
 
+    def test_set_membership_is_not_supported(self) -> None:
+        with pytest.raises(ParseError):
+            parse("rules { require type(X) in {float, double}; }")
+
+    def test_optional_input_marker_is_not_supported(self) -> None:
+        with pytest.raises(ParseError):
+            parse("rules { inputs X, W, B?; outputs Y; }")
+
 
 # ---------------------------------------------------------------
 # Comments
